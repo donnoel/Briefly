@@ -120,7 +120,11 @@ struct AIGenerationSheet: View {
             } catch {
                 await MainActor.run {
                     isGenerating = false
-                    errorMessage = "Error: \(error.localizedDescription)"
+                    if let clientError = error as? OpenAIClient.ClientError {
+                        errorMessage = clientError.localizedDescription
+                    } else {
+                        errorMessage = "Error: \(error.localizedDescription)"
+                    }
                 }
             }
         }

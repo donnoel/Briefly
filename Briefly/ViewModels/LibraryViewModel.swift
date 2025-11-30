@@ -18,6 +18,6 @@ final class LibraryViewModel: ObservableObject {
     }
 
     func insert(_ topic: TopicPack) {
-        topics.append(topic)
+        topics.insert(topic, at: 0)
     }
 }
