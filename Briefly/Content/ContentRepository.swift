@@ -26,15 +26,20 @@ final class ContentRepository {
 
     // MARK: - Mutation
 
-    func appendUserPack(_ pack: TopicPackDTO) {
+    @discardableResult
+    func appendUserPack(_ pack: TopicPackDTO) -> TopicPack? {
         userPackDTOs.append(pack)
         diskStore.saveUserPacks(userPackDTOs)
 
         var combined = seedPackDTOs + userPackDTOs
         let loadedTopics = combined.compactMap { $0.toModel() }
-        if !loadedTopics.isEmpty {
+        if let newTopic = pack.toModel() {
+            topics.append(newTopic)
+        } else if !loadedTopics.isEmpty {
             topics = loadedTopics
         }
+
+        return pack.toModel()
     }
 
     // MARK: - Sample Content

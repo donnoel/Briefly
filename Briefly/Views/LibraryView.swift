@@ -37,7 +37,9 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: $showingAIGenerator) {
-            AIGenerationSheet(isPresented: $showingAIGenerator)
+            AIGenerationSheet(isPresented: $showingAIGenerator) { newTopic in
+                viewModel.insert(newTopic)
+            }
         }
     }
 }

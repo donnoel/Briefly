@@ -16,4 +16,8 @@ final class LibraryViewModel: ObservableObject {
     func progress(for topic: TopicPack) -> Double {
         progressStore.progress(for: topic)
     }
+
+    func insert(_ topic: TopicPack) {
+        topics.append(topic)
+    }
 }
