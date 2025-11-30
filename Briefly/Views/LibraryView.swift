@@ -5,6 +5,7 @@ struct LibraryView: View {
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: LibraryViewModel
     @State private var showingAIGenerator = false
+    @State private var showingSettings = false
 
     var body: some View {
         ScrollView {
@@ -27,6 +28,14 @@ struct LibraryView: View {
         }
         .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .accessibilityLabel("Settings")
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showingAIGenerator = true
@@ -40,6 +49,9 @@ struct LibraryView: View {
             AIGenerationSheet(isPresented: $showingAIGenerator) { newTopic in
                 viewModel.insert(newTopic)
             }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsSheet(isPresented: $showingSettings)
         }
     }
 }
