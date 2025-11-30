@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DeckView: View {
     @ObservedObject var viewModel: DeckSessionViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     private var progressFraction: Double {
         guard !viewModel.cards.isEmpty else { return 0 }
@@ -35,27 +36,47 @@ struct DeckView: View {
 
             Spacer(minLength: 8)
 
-            // Card area
+            // Card or completion
             if let card = viewModel.currentCard {
                 CardView(
                     card: card,
                     isShowingBack: viewModel.isShowingBack,
-                    revealAction: { viewModel.reveal() }
+                    revealAction: {
+                        if !viewModel.isShowingBack {
+                            BrieflyHaptics.soft()
+                        }
+                        viewModel.reveal()
+                    }
                 )
                 .padding(.horizontal, 24)
                 .transition(.opacity.combined(with: .scale))
             } else {
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(BrieflyTheme.Colors.accent)
+
                     Text("Section complete")
                         .font(.title3.bold())
                         .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
+                    Text("You’ve seen every card in this section. You can restart or head back to explore more topics.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+
                     Button("Restart section") {
+                        BrieflyHaptics.soft()
                         viewModel.restart()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(BrieflyPrimaryButtonStyle())
                 }
                 .padding(.horizontal, 24)
+                .padding(.bottom, 32)
+                .onAppear {
+                    BrieflyHaptics.success()
+                }
             }
 
             Spacer()
@@ -68,35 +89,34 @@ struct DeckView: View {
                             viewModel.markReviewAndAdvance()
                         } label: {
                             Text("Review again")
-                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(BrieflySecondaryButtonStyle())
 
                         Button {
+                            BrieflyHaptics.soft()
                             viewModel.markKnownAndAdvance()
                         } label: {
                             Text("Got it")
-                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(BrieflyPrimaryButtonStyle())
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 20)
                 } else {
                     Button {
+                        BrieflyHaptics.soft()
                         viewModel.reveal()
                     } label: {
                         Text("See answer")
-                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(BrieflyPrimaryButtonStyle())
                     .padding(.horizontal, 24)
                     .padding(.bottom, 20)
                 }
             }
 
         }
-        .background(BrieflyTheme.Colors.background.ignoresSafeArea())
+        .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
     }
 }

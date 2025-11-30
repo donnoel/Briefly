@@ -2,18 +2,40 @@ import SwiftUI
 
 enum BrieflyTheme {
     enum Colors {
-        /// App background – soft, slightly cool, easy on the eyes.
-        static let background = Color(
-            red: 0.95,
-            green: 0.96,
-            blue: 1.00
-        )
 
-        /// Elevated surfaces like cards.
-        static let cardBackground = Color.white.opacity(0.94)
+        // MARK: - Backgrounds
+
+        /// App background – adapts to light/dark.
+        static func background(_ scheme: ColorScheme) -> Color {
+            switch scheme {
+            case .dark:
+                return Color(uiColor: .systemGroupedBackground)
+            default:
+                return Color(red: 0.95, green: 0.96, blue: 1.00)
+            }
+        }
+
+        /// Elevated surfaces like cards – adapts to light/dark.
+        static func cardBackground(_ scheme: ColorScheme) -> Color {
+            switch scheme {
+            case .dark:
+                return Color(uiColor: .secondarySystemBackground)
+            default:
+                return Color.white.opacity(0.94)
+            }
+        }
 
         /// Very soft stroke / border for subtle separation.
-        static let cardStroke = Color.black.opacity(0.04)
+        static func cardStroke(_ scheme: ColorScheme) -> Color {
+            switch scheme {
+            case .dark:
+                return Color.white.opacity(0.06)
+            default:
+                return Color.black.opacity(0.04)
+            }
+        }
+
+        // MARK: - Accents
 
         /// Primary accent for buttons, chips, and key highlights.
         static let accent = Color(
@@ -23,7 +45,14 @@ enum BrieflyTheme {
         )
 
         /// Soft accent background for pills and tags.
-        static let accentSoft = accent.opacity(0.16)
+        static func accentSoft(_ scheme: ColorScheme) -> Color {
+            switch scheme {
+            case .dark:
+                return accent.opacity(0.32)
+            default:
+                return accent.opacity(0.16)
+            }
+        }
 
         /// Secondary accent (used sparingly for gradients, etc.).
         static let accentSecondary = Color(
@@ -33,30 +62,67 @@ enum BrieflyTheme {
         )
 
         /// Shadow for floating cards.
-        static let shadowSoft = Color.black.opacity(0.10)
+        static func shadowSoft(_ scheme: ColorScheme) -> Color {
+            switch scheme {
+            case .dark:
+                return Color.black.opacity(0.6)
+            default:
+                return Color.black.opacity(0.10)
+            }
+        }
 
-        /// Text colors – keep these dynamic for Light/Dark & accessibility.
+        // MARK: - Text
+
         static let textPrimary = Color.primary
         static let textSecondary = Color.secondary
 
-        /// Gradients for cards (front vs back state).
-        static let cardGradientFront = LinearGradient(
-            colors: [
-                Color.white.opacity(0.96),
-                Color(red: 0.94, green: 0.95, blue: 1.0)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        // MARK: - Card gradients
 
-        static let cardGradientBack = LinearGradient(
-            colors: [
-                Color(red: 0.90, green: 0.92, blue: 1.0),
-                Color(red: 0.80, green: 0.84, blue: 1.0)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        static func cardGradientFront(_ scheme: ColorScheme) -> LinearGradient {
+            switch scheme {
+            case .dark:
+                return LinearGradient(
+                    colors: [
+                        Color(red: 0.10, green: 0.11, blue: 0.16),
+                        Color(red: 0.08, green: 0.09, blue: 0.13)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            default:
+                return LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.96),
+                        Color(red: 0.94, green: 0.95, blue: 1.0)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+
+        static func cardGradientBack(_ scheme: ColorScheme) -> LinearGradient {
+            switch scheme {
+            case .dark:
+                return LinearGradient(
+                    colors: [
+                        Color(red: 0.13, green: 0.16, blue: 0.26),
+                        Color(red: 0.10, green: 0.11, blue: 0.19)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            default:
+                return LinearGradient(
+                    colors: [
+                        Color(red: 0.90, green: 0.92, blue: 1.0),
+                        Color(red: 0.80, green: 0.84, blue: 1.0)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
     }
 
     enum Layout {

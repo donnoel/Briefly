@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CardView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let card: Card
     let isShowingBack: Bool
     let revealAction: () -> Void
@@ -10,11 +12,11 @@ struct CardView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(
                     isShowingBack
-                    ? BrieflyTheme.Colors.cardGradientBack
-                    : BrieflyTheme.Colors.cardGradientFront
+                    ? BrieflyTheme.Colors.cardGradientBack(colorScheme)
+                    : BrieflyTheme.Colors.cardGradientFront(colorScheme)
                 )
                 .shadow(
-                    color: BrieflyTheme.Colors.shadowSoft,
+                    color: BrieflyTheme.Colors.shadowSoft(colorScheme),
                     radius: 14,
                     x: 0,
                     y: 10
@@ -26,7 +28,7 @@ struct CardView: View {
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
 
                 Text(isShowingBack ? card.back : card.front)
-                    .font(.title3)
+                    .font(.title3) // main learning content
                     .foregroundColor(BrieflyTheme.Colors.textPrimary)
                     .multilineTextAlignment(.leading)
 
@@ -46,7 +48,7 @@ struct CardView: View {
                         .padding(.vertical, 6)
                         .background(
                             Capsule()
-                                .fill(Color.white.opacity(0.22))
+                                .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.22))
                         )
                     }
                     .buttonStyle(.plain)

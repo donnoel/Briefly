@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LibraryView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: LibraryViewModel
 
     var body: some View {
@@ -23,6 +24,6 @@ struct LibraryView: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
-        .background(BrieflyTheme.Colors.background.ignoresSafeArea())
+        .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
     }
 }

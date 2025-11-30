@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TopicDetailView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: TopicDetailViewModel
 
     var body: some View {
@@ -11,7 +12,7 @@ struct TopicDetailView: View {
                 // Hero summary card
                 VStack(alignment: .leading, spacing: 10) {
                     Text(viewModel.topic.title)
-                        .font(.title2.bold())
+                        .font(.title2.weight(.semibold))
                         .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
                     Text(viewModel.topic.subtitle)
@@ -47,12 +48,16 @@ struct TopicDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: BrieflyTheme.Layout.cardCornerRadius, style: .continuous)
-                        .fill(BrieflyTheme.Colors.cardBackground)
-                        .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 8)
+                        .fill(BrieflyTheme.Colors.cardBackground(colorScheme))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: BrieflyTheme.Layout.cardCornerRadius, style: .continuous)
+                                .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
+                        )
+                        .shadow(color: BrieflyTheme.Colors.shadowSoft(colorScheme),
+                                radius: 12, x: 0, y: 8)
                 )
                 .padding(.horizontal, 16)
 
-                // Sections header
                 if !viewModel.sections.isEmpty {
                     Text("Sections")
                         .font(.footnote.weight(.semibold))
@@ -60,7 +65,6 @@ struct TopicDetailView: View {
                         .padding(.horizontal, 20)
                 }
 
-                // Section cards
                 LazyVStack(spacing: 12) {
                     ForEach(viewModel.sections) { section in
                         Button {
@@ -90,8 +94,16 @@ struct TopicDetailView: View {
                                     cornerRadius: BrieflyTheme.Layout.cardCornerRadius,
                                     style: .continuous
                                 )
-                                .fill(BrieflyTheme.Colors.cardBackground)
-                                .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                                .fill(BrieflyTheme.Colors.cardBackground(colorScheme))
+                                .overlay(
+                                    RoundedRectangle(
+                                        cornerRadius: BrieflyTheme.Layout.cardCornerRadius,
+                                        style: .continuous
+                                    )
+                                    .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
+                                )
+                                .shadow(color: BrieflyTheme.Colors.shadowSoft(colorScheme),
+                                        radius: 8, x: 0, y: 4)
                             )
                         }
                         .buttonStyle(.plain)
@@ -102,7 +114,7 @@ struct TopicDetailView: View {
             }
             .padding(.top, 12)
         }
-        .background(BrieflyTheme.Colors.background.ignoresSafeArea())
+        .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
         .navigationTitle(viewModel.topic.title)
         .navigationBarTitleDisplayMode(.inline)
     }
