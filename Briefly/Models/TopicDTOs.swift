@@ -1,0 +1,62 @@
+import Foundation
+
+// Codable representations for loading/saving topic packs.
+struct CardDTO: Codable, Hashable {
+    let id: String
+    let front: String
+    let back: String
+    let source: String?
+    let tags: [String]?
+
+    func toModel() -> Card {
+        Card(
+            id: id,
+            front: front,
+            back: back
+        )
+    }
+}
+
+struct TopicSectionDTO: Codable, Hashable {
+    let id: String
+    let title: String
+    let cards: [CardDTO]
+
+    func toModel() -> TopicSection {
+        TopicSection(
+            id: id,
+            title: title,
+            cards: cards.map { $0.toModel() }
+        )
+    }
+}
+
+struct TopicPackDTO: Codable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let category: String
+    let difficulty: String
+    let estimatedMinutes: Int
+    let language: String?
+    let description: String?
+    let author: String?
+    let version: String?
+    let sections: [TopicSectionDTO]
+
+    func toModel() -> TopicPack? {
+        guard let difficultyEnum = Difficulty(rawValue: difficulty) else {
+            return nil
+        }
+
+        return TopicPack(
+            id: id,
+            title: title,
+            subtitle: subtitle,
+            category: category,
+            difficulty: difficultyEnum,
+            estimatedMinutes: estimatedMinutes,
+            sections: sections.map { $0.toModel() }
+        )
+    }
+}

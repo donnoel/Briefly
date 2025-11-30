@@ -4,9 +4,22 @@ final class ContentRepository {
     static let shared = ContentRepository()
 
     private(set) var topics: [TopicPack] = []
+    private let diskStore: ContentDiskStore
 
-    private init() {
-        topics = Self.sampleTopics
+    private init(diskStore: ContentDiskStore = ContentDiskStore()) {
+        self.diskStore = diskStore
+        loadContent()
+    }
+
+    // MARK: - Loading
+
+    private func loadContent() {
+        let seedDTOs = diskStore.loadSeedPacks()
+        let userDTOs = diskStore.loadUserPacks()
+        let allDTOs = seedDTOs + userDTOs
+
+        let loadedTopics = allDTOs.compactMap { $0.toModel() }
+        topics = loadedTopics.isEmpty ? Self.sampleTopics : loadedTopics
     }
 
     // MARK: - Sample Content
