@@ -4,6 +4,7 @@ struct LibraryView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: LibraryViewModel
+    @State private var showingAIGenerator = false
 
     var body: some View {
         ScrollView {
@@ -25,5 +26,18 @@ struct LibraryView: View {
             .padding(.bottom, 24)
         }
         .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingAIGenerator = true
+                } label: {
+                    Image(systemName: "sparkles")
+                }
+                .accessibilityLabel("Generate with AI")
+            }
+        }
+        .sheet(isPresented: $showingAIGenerator) {
+            AIGenerationSheet(isPresented: $showingAIGenerator)
+        }
     }
 }

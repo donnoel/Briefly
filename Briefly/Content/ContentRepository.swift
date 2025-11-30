@@ -5,6 +5,8 @@ final class ContentRepository {
 
     private(set) var topics: [TopicPack] = []
     private let diskStore: ContentDiskStore
+    private var seedPackDTOs: [TopicPackDTO] = []
+    private var userPackDTOs: [TopicPackDTO] = []
 
     private init(diskStore: ContentDiskStore = ContentDiskStore()) {
         self.diskStore = diskStore
@@ -14,12 +16,25 @@ final class ContentRepository {
     // MARK: - Loading
 
     private func loadContent() {
-        let seedDTOs = diskStore.loadSeedPacks()
-        let userDTOs = diskStore.loadUserPacks()
-        let allDTOs = seedDTOs + userDTOs
+        seedPackDTOs = diskStore.loadSeedPacks()
+        userPackDTOs = diskStore.loadUserPacks()
+        let allDTOs = seedPackDTOs + userPackDTOs
 
         let loadedTopics = allDTOs.compactMap { $0.toModel() }
         topics = loadedTopics.isEmpty ? Self.sampleTopics : loadedTopics
+    }
+
+    // MARK: - Mutation
+
+    func appendUserPack(_ pack: TopicPackDTO) {
+        userPackDTOs.append(pack)
+        diskStore.saveUserPacks(userPackDTOs)
+
+        var combined = seedPackDTOs + userPackDTOs
+        let loadedTopics = combined.compactMap { $0.toModel() }
+        if !loadedTopics.isEmpty {
+            topics = loadedTopics
+        }
     }
 
     // MARK: - Sample Content
