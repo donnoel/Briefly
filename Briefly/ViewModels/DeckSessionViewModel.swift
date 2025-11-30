@@ -1,0 +1,55 @@
+import Foundation
+import Combine
+
+final class DeckSessionViewModel: ObservableObject {
+    let topic: TopicPack
+    let section: TopicSection
+
+    @Published private(set) var cards: [Card]
+    @Published private(set) var currentIndex: Int = 0
+    @Published var isShowingBack: Bool = false
+
+    private let progressStore: ProgressStore
+
+    var currentCard: Card? {
+        guard cards.indices.contains(currentIndex) else { return nil }
+        return cards[currentIndex]
+    }
+
+    init(topic: TopicPack, section: TopicSection, progressStore: ProgressStore) {
+        self.topic = topic
+        self.section = section
+        self.cards = section.cards
+        self.progressStore = progressStore
+    }
+
+    // MARK: - Intent
+
+    func reveal() {
+        isShowingBack = true
+    }
+
+    func markKnownAndAdvance() {
+        if let card = currentCard {
+            progressStore.markLearned(card)
+        }
+        goToNextCard()
+    }
+
+    func markReviewAndAdvance() {
+        // For now, "review" just advances without marking learned.
+        goToNextCard()
+    }
+
+    private func goToNextCard() {
+        isShowingBack = false
+        if currentIndex < cards.count - 1 {
+            currentIndex += 1
+        }
+    }
+
+    func restart() {
+        currentIndex = 0
+        isShowingBack = false
+    }
+}
