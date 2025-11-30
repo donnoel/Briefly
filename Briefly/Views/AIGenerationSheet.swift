@@ -11,6 +11,8 @@ struct AIGenerationSheet: View {
     @State private var apiKey: String = APIKeyStore.shared.apiKey ?? ""
     @State private var isGenerating = false
     @State private var errorMessage: String?
+    @State private var pendingDTO: TopicPackDTO?
+    @State private var showingReview = false
 
     var body: some View {
         NavigationStack {
@@ -70,6 +72,24 @@ struct AIGenerationSheet: View {
                 Text(errorMessage ?? "Unknown error")
             }
         }
+        .sheet(isPresented: $showingReview) {
+            if let dto = pendingDTO {
+                NavigationStack {
+                    GeneratedPackReviewView(
+                        viewModel: GeneratedPackReviewViewModel(pack: dto),
+                        onSave: { editedDTO in
+                            if let model = ContentRepository.shared.appendUserPack(editedDTO) {
+                                onSave(model)
+                                isPresented = false
+                            } else {
+                                errorMessage = "Edited content could not be parsed."
+                            }
+                        },
+                        originalDTO: dto
+                    )
+                }
+            }
+        }
     }
 
     private func generate() {
@@ -92,17 +112,10 @@ struct AIGenerationSheet: View {
                     language: language,
                     estimatedMinutes: estimatedMinutes
                 )
-                if let model = ContentRepository.shared.appendUserPack(dto) {
-                    await MainActor.run {
-                        onSave(model)
-                        isGenerating = false
-                        isPresented = false
-                    }
-                } else {
-                    await MainActor.run {
-                        isGenerating = false
-                        errorMessage = "Generated content could not be parsed."
-                    }
+                await MainActor.run {
+                    pendingDTO = dto
+                    isGenerating = false
+                    showingReview = true
                 }
             } catch {
                 await MainActor.run {
