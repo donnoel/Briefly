@@ -9,7 +9,7 @@ final class OpenAIClient {
 
         init(
             apiKeyProvider: @escaping () -> String?,
-            model: String = "gpt-4o-mini",
+            model: String = "gpt-4.1-mini",
             baseURL: URL = URL(string: "https://api.openai.com/v1")!
         ) {
             self.apiKeyProvider = apiKeyProvider

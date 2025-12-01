@@ -114,7 +114,11 @@ struct AIGenerationSheet: View {
         errorMessage = nil
         APIKeyStore.shared.apiKey = apiKey
 
-        let configuration = OpenAIClient.Configuration(apiKeyProvider: { APIKeyStore.shared.apiKey })
+        let preferredModel = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
+        let configuration = OpenAIClient.Configuration(
+            apiKeyProvider: { APIKeyStore.shared.apiKey },
+            model: preferredModel
+        )
         let client = OpenAIClient(configuration: configuration)
         let service = AIContentService(client: client)
 

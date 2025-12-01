@@ -4,6 +4,15 @@ struct SettingsSheet: View {
     @Binding var isPresented: Bool
     @State private var apiKey: String = APIKeyStore.shared.apiKey ?? ""
     @State private var statusMessage: String?
+    @State private var selectedModel: String = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
+
+    private let modelOptions: [String] = [
+        "gpt-4.1-mini",
+        "gpt-4o-mini",
+        "gpt-4.1",
+        "gpt-4o",
+        "gpt-5.1"
+    ]
 
     var body: some View {
         NavigationStack {
@@ -32,6 +41,18 @@ struct SettingsSheet: View {
                             .foregroundColor(.secondary)
                     } else {
                         Text("Stored securely in the iOS Keychain.")
+                    }
+                }
+
+                Section("Model") {
+                    Picker("Preferred Model", selection: $selectedModel) {
+                        ForEach(modelOptions, id: \.self) { model in
+                            Text(model).tag(model)
+                        }
+                    }
+                    .onChange(of: selectedModel) { newValue in
+                        ModelPreferenceStore.shared.preferredModel = newValue
+                        statusMessage = "Model set to \(newValue)."
                     }
                 }
             }

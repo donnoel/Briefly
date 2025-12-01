@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @MainActor
 final class ProgressStore: ObservableObject {
@@ -10,9 +13,11 @@ final class ProgressStore: ObservableObject {
     private let storageKey = "Briefly.learnedCardIDs"
     private let saveDebounceInterval: TimeInterval = 0.5
     private var pendingSaveWorkItem: DispatchWorkItem?
+    private var backgroundObserver: NSObjectProtocol?
 
     private init() {
         load()
+        observeAppBackground()
     }
 
     // MARK: - Public
@@ -62,8 +67,30 @@ final class ProgressStore: ObservableObject {
 
     deinit {
         pendingSaveWorkItem?.cancel()
+        backgroundObserver.map(NotificationCenter.default.removeObserver)
         Task { @MainActor in
-            self.save()
+            self.flushPendingSaves()
         }
+    }
+
+    private func observeAppBackground() {
+        #if canImport(UIKit)
+        backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.flushPendingSaves()
+            }
+        }
+        #endif
+    }
+
+    private func flushPendingSaves() {
+        pendingSaveWorkItem?.cancel()
+        pendingSaveWorkItem = nil
+        save()
     }
 }
