@@ -21,33 +21,28 @@ struct SettingsSheet: View {
             Form {
                 Section("OpenAI API Key") {
                     HStack {
-                        if let currentKey = APIKeyStore.shared.apiKey, !currentKey.isEmpty {
-                            Label("Saved", systemImage: "checkmark.seal.fill")
-                                .foregroundColor(.green)
-                        } else {
-                            Label("Not set", systemImage: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
-                        }
+                        Label(keyStatusText, systemImage: keyStatusIcon)
+                            .foregroundColor(keyStatusColor)
                         Spacer()
-                        Button("Add/Update") {
+                        Button {
                             pendingKey = ""
                             showingKeyEntry = true
+                        } label: {
+                            Text("Manage")
+                                .font(.callout.weight(.semibold))
                         }
-                        Button("Clear", role: .destructive) {
+                        .buttonStyle(.borderedProminent)
+                        .tint(.accentColor)
+                        Button(role: .destructive) {
                             APIKeyStore.shared.apiKey = nil
                             statusMessage = "Key removed."
+                        } label: {
+                            Image(systemName: "trash")
                         }
                     }
-
-                    if let statusMessage {
-                        Text(statusMessage)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Stored securely in Keychain.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    Text(statusMessage ?? "Stored in Keychain.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("Model") {
@@ -92,6 +87,9 @@ struct SettingsSheet: View {
                         SecureField("Enter or paste key", text: $pendingKey)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                        Text("Keys are stored securely in the iOS Keychain.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 .navigationTitle("Set API Key")
@@ -119,7 +117,24 @@ struct SettingsSheet: View {
         return "\(version) (\(build))"
     }
 
-    private var selectedModelNote: String? {
-        modelOptions.first(where: { $0.id == selectedModel })?.note
+    private var keyStatusText: String {
+        if let currentKey = APIKeyStore.shared.apiKey, !currentKey.isEmpty {
+            return "Key saved"
+        }
+        return "Key not set"
+    }
+
+    private var keyStatusIcon: String {
+        if let currentKey = APIKeyStore.shared.apiKey, !currentKey.isEmpty {
+            return "checkmark.seal.fill"
+        }
+        return "exclamationmark.triangle.fill"
+    }
+
+    private var keyStatusColor: Color {
+        if let currentKey = APIKeyStore.shared.apiKey, !currentKey.isEmpty {
+            return .green
+        }
+        return .orange
     }
 }
