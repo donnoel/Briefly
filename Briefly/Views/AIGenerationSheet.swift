@@ -130,6 +130,7 @@ struct AIGenerationSheet: View {
 
                 var aggregatedSections: [TopicSectionDTO] = []
                 var baseDTO: TopicPackDTO?
+                var sectionCounter = 0
 
                 for batch in 0..<totalBatches {
                     let remaining = targetSections - aggregatedSections.count
@@ -147,7 +148,26 @@ struct AIGenerationSheet: View {
                     if baseDTO == nil {
                         baseDTO = dto
                     }
-                    aggregatedSections.append(contentsOf: dto.sections)
+                    for section in dto.sections {
+                        if aggregatedSections.count >= targetSections { break }
+                        let normalizedID = "\(dto.id)_section_\(sectionCounter)"
+                        sectionCounter += 1
+                        let normalizedSection = TopicSectionDTO(
+                            id: normalizedID,
+                            title: section.title,
+                            cards: section.cards.enumerated().map { index, card in
+                                let cardID = "\(normalizedID)_card_\(index)"
+                                return CardDTO(
+                                    id: cardID,
+                                    front: card.front,
+                                    back: card.back,
+                                    source: card.source,
+                                    tags: card.tags
+                                )
+                            }
+                        )
+                        aggregatedSections.append(normalizedSection)
+                    }
 
                     await MainActor.run {
                         progressFraction = Double(batch + 1) / Double(totalBatches)
