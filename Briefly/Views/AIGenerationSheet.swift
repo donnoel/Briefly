@@ -8,7 +8,6 @@ struct AIGenerationSheet: View {
     @State private var difficulty: Difficulty = .beginner
     @State private var estimatedMinutes: Int = 20
     @State private var language: String = "en"
-    @State private var apiKey: String = APIKeyStore.shared.apiKey ?? ""
     @State private var targetSections: Int = 3
     @State private var targetCardsPerSection: Int = 5
     @State private var isGenerating = false
@@ -46,12 +45,6 @@ struct AIGenerationSheet: View {
                         .foregroundColor(.secondary)
                 }
 
-                Section("OpenAI") {
-                    SecureField("API Key", text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                }
-
                 Section {
                     Button {
                         generate()
@@ -62,7 +55,7 @@ struct AIGenerationSheet: View {
                             Label("Generate with AI", systemImage: "sparkles")
                         }
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || apiKey.isEmpty || isGenerating)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
                 } footer: {
                     Text("Content will be drafted with OpenAI and saved locally after generation.")
                 }
@@ -108,7 +101,11 @@ struct AIGenerationSheet: View {
 
     private func generate() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedTitle.isEmpty, !apiKey.isEmpty else { return }
+        guard !trimmedTitle.isEmpty else { return }
+        guard let apiKey = APIKeyStore.shared.apiKey, !apiKey.isEmpty else {
+            errorMessage = "Please set your OpenAI API key in Settings."
+            return
+        }
 
         isGenerating = true
         errorMessage = nil
@@ -116,7 +113,7 @@ struct AIGenerationSheet: View {
 
         let preferredModel = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
         let configuration = OpenAIClient.Configuration(
-            apiKeyProvider: { APIKeyStore.shared.apiKey },
+            apiKeyProvider: { apiKey },
             model: preferredModel
         )
         let client = OpenAIClient(configuration: configuration)
