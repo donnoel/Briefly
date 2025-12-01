@@ -18,6 +18,19 @@ struct AIGenerationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Button {
+                        generate()
+                    } label: {
+                        if isGenerating {
+                            ProgressView()
+                        } else {
+                            Label("Generate with AI", systemImage: "sparkles")
+                        }
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
+                }
+
                 Section("Topic") {
                     TextField("Title or concept", text: $title)
                     Picker("Difficulty", selection: $difficulty) {
@@ -33,34 +46,16 @@ struct AIGenerationSheet: View {
                         .autocorrectionDisabled()
                 }
 
-                Section("Size (for AI generation)") {
+                Section("Size") {
                     Stepper(value: $targetSections, in: 1...50) {
                         Text("Sections: \(targetSections)")
                     }
                     Stepper(value: $targetCardsPerSection, in: 1...50) {
                         Text("Cards per section: \(targetCardsPerSection)")
                     }
-                    Text("For ~500 cards total, try 10 sections × 50 cards.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-
-                Section {
-                    Button {
-                        generate()
-                    } label: {
-                        if isGenerating {
-                            ProgressView()
-                        } else {
-                            Label("Generate with AI", systemImage: "sparkles")
-                        }
-                    }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
-                } footer: {
-                    Text("Content will be drafted with OpenAI and saved locally after generation.")
                 }
             }
-            .navigationTitle("New AI Topic")
+            .navigationTitle("New Topic")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { isPresented = false }
