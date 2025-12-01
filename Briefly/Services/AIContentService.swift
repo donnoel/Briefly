@@ -53,6 +53,7 @@ final class AIContentService {
             Create a topic on "\(title)" for \(difficulty.rawValue.lowercased()) learners.
             Language: \(language).
             Aim for about \(clampedSections) sections with \(clampedCards) cards each.
+            Difficulty guidance: \(difficultyGuidance(for: difficulty))
             """
         )
 
@@ -74,6 +75,17 @@ final class AIContentService {
             return dto
         } catch {
             throw ServiceError.decodingFailed
+        }
+    }
+
+    private func difficultyGuidance(for difficulty: Difficulty) -> String {
+        switch difficulty {
+        case .beginner:
+            return "Use simple language, one-line answers, no jargon."
+        case .intermediate:
+            return "Assume some background, concise but more specific terminology."
+        case .advanced:
+            return "Use precise terminology, include nuance and edge cases briefly."
         }
     }
 }
