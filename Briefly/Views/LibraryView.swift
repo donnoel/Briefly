@@ -29,6 +29,8 @@ struct LibraryView: View {
         .scrollContentBackground(.hidden)
         .refreshable { viewModel.refresh() }
         .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search topics")
+        .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
         .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -107,9 +109,15 @@ struct LibraryView: View {
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
         .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
+        .transition(.asymmetric(
+            insertion: .opacity.combined(with: .move(edge: .top)),
+            removal: .opacity.combined(with: .move(edge: .bottom))
+        ))
         .swipeActions(edge: .leading) {
             Button {
-                viewModel.toggleCompleted(topic)
+                withAnimation {
+                    viewModel.toggleCompleted(topic)
+                }
             } label: {
                 Label(viewModel.isCompleted(topic) ? "Mark Incomplete" : "Mark Complete", systemImage: "checkmark.seal")
             }
@@ -117,7 +125,9 @@ struct LibraryView: View {
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
-                viewModel.delete(topic)
+                withAnimation {
+                    viewModel.delete(topic)
+                }
             } label: {
                 Label("Delete", systemImage: "trash")
             }

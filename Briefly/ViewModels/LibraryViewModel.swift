@@ -32,8 +32,7 @@ final class LibraryViewModel: ObservableObject {
         statusStore.$completedIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                guard let self else { return }
-                self.topics = self.topics
+                self?.objectWillChange.send()
             }
             .store(in: &cancellables)
     }
