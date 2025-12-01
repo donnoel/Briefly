@@ -89,6 +89,12 @@ struct DeckView: View {
                         viewModel.restart()
                     }
                     .buttonStyle(BrieflySecondaryButtonStyle())
+
+                    Button("Back to topic") {
+                        BrieflyHaptics.light()
+                        coordinator.popLast()
+                    }
+                    .buttonStyle(.bordered)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
