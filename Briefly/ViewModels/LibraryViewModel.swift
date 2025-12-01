@@ -81,4 +81,8 @@ final class LibraryViewModel: ObservableObject {
     func isCompleted(_ topic: TopicPack) -> Bool {
         contentRepository.isCompleted(topic)
     }
+
+    func moveActiveTopics(from source: IndexSet, to destination: Int) {
+        contentRepository.reorderActiveTopics(from: source, to: destination)
+    }
 }

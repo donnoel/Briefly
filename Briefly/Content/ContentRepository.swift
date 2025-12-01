@@ -1,3 +1,4 @@
+import SwiftUI
 import Foundation
 import Combine
 
@@ -10,10 +11,16 @@ final class ContentRepository: ObservableObject {
     private var seedPackDTOs: [TopicPackDTO] = []
     private var userPackDTOs: [TopicPackDTO] = []
     private let statusStore: TopicStatusStore
+    private let orderStore: TopicOrderStore
 
-    private init(diskStore: ContentDiskStore = ContentDiskStore(), statusStore: TopicStatusStore = TopicStatusStore.shared) {
+    private init(
+        diskStore: ContentDiskStore = ContentDiskStore(),
+        statusStore: TopicStatusStore = TopicStatusStore.shared,
+        orderStore: TopicOrderStore = TopicOrderStore.shared
+    ) {
         self.diskStore = diskStore
         self.statusStore = statusStore
+        self.orderStore = orderStore
         loadContent()
     }
 
@@ -24,7 +31,8 @@ final class ContentRepository: ObservableObject {
         userPackDTOs = diskStore.loadUserPacks()
         let mergedDTOs = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
 
-        let loadedTopics = mergedDTOs.compactMap { $0.toModel() }
+        var loadedTopics = mergedDTOs.compactMap { $0.toModel() }
+        applyOrdering(to: &loadedTopics)
         topics = loadedTopics.isEmpty ? Self.sampleTopics : loadedTopics
     }
 
@@ -47,7 +55,8 @@ final class ContentRepository: ObservableObject {
         diskStore.saveUserPacks(userPackDTOs)
 
         let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
-        let loadedTopics = combined.compactMap { $0.toModel() }
+        var loadedTopics = combined.compactMap { $0.toModel() }
+        applyOrdering(to: &loadedTopics)
         if !loadedTopics.isEmpty {
             topics = loadedTopics
         }
@@ -78,6 +87,14 @@ final class ContentRepository: ObservableObject {
         statusStore.isCompleted(topic.id)
     }
 
+    func reorderActiveTopics(from source: IndexSet, to destination: Int) {
+        var active = topics.filter { !statusStore.isCompleted($0.id) }
+        let completed = topics.filter { statusStore.isCompleted($0.id) }
+        active.move(fromOffsets: source, toOffset: destination)
+        topics = active + completed
+        orderStore.saveOrder(for: active.map { $0.id })
+    }
+
     private func filteredForDeletion(_ dtos: [TopicPackDTO]) -> [TopicPackDTO] {
         dtos.filter { !statusStore.isDeleted($0.id) }
     }
@@ -105,6 +122,41 @@ final class ContentRepository: ObservableObject {
         let users = merged.filter { userIDs.contains($0.id) }
         let seeds = merged.filter { !userIDs.contains($0.id) }
         return users + seeds
+    }
+
+    private func applyOrdering(to topicModels: inout [TopicPack]) {
+        let order = orderStore.loadOrder()
+        guard !order.isEmpty else { return }
+
+        var orderMap: [String: Int] = [:]
+        for (idx, id) in order.enumerated() {
+            orderMap[id] = idx
+        }
+
+        topicModels.sort { lhs, rhs in
+            let lhsCompleted = statusStore.isCompleted(lhs.id)
+            let rhsCompleted = statusStore.isCompleted(rhs.id)
+
+            // Keep completed items after active items
+            if lhsCompleted != rhsCompleted {
+                return !lhsCompleted && rhsCompleted
+            }
+
+            // Within active items, respect stored order; fall back to current order.
+            let lhsOrder = orderMap[lhs.id]
+            let rhsOrder = orderMap[rhs.id]
+
+            switch (lhsOrder, rhsOrder) {
+            case let (.some(l), .some(r)):
+                return l < r
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                return false
+            }
+        }
     }
 
     // MARK: - Sample Content

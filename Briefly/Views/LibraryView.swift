@@ -14,6 +14,9 @@ struct LibraryView: View {
                     ForEach(viewModel.activeTopics) { topic in
                         topicRow(topic)
                     }
+                    .onMove { indices, newOffset in
+                        viewModel.moveActiveTopics(from: indices, to: newOffset)
+                    }
                 }
             }
 
