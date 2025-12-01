@@ -46,9 +46,7 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: $showingAIGenerator) {
-            AIGenerationSheet(isPresented: $showingAIGenerator) { newTopic in
-                viewModel.insert(newTopic)
-            }
+            AIGenerationSheet(isPresented: $showingAIGenerator) { _ in }
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(isPresented: $showingSettings)

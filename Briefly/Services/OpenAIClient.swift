@@ -48,7 +48,7 @@ final class OpenAIClient {
 
     func chatCompletion(
         messages: [OpenAIChatMessage],
-        responseFormat: OpenAIResponseFormat = .jsonObject,
+        responseFormat: OpenAIResponseFormat = OpenAIResponseFormat(type: "json_object"),
         temperature: Double = 0.5
     ) async throws -> OpenAIChatResponse {
         guard let apiKey = config.apiKeyProvider(), !apiKey.isEmpty else {

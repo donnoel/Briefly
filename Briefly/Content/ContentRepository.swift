@@ -1,9 +1,10 @@
 import Foundation
+import Combine
 
-final class ContentRepository {
+final class ContentRepository: ObservableObject {
     static let shared = ContentRepository()
 
-    private(set) var topics: [TopicPack] = []
+    @Published private(set) var topics: [TopicPack] = []
     private let diskStore: ContentDiskStore
     private var seedPackDTOs: [TopicPackDTO] = []
     private var userPackDTOs: [TopicPackDTO] = []
@@ -31,7 +32,7 @@ final class ContentRepository {
         userPackDTOs.append(pack)
         diskStore.saveUserPacks(userPackDTOs)
 
-        var combined = seedPackDTOs + userPackDTOs
+        let combined = seedPackDTOs + userPackDTOs
         let loadedTopics = combined.compactMap { $0.toModel() }
         if let newTopic = pack.toModel() {
             topics.append(newTopic)
