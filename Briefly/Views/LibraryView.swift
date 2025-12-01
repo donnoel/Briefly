@@ -17,11 +17,34 @@ struct LibraryView: View {
                         topic: topic,
                         progress: viewModel.progress(for: topic)
                     )
+                    .overlay(alignment: .topTrailing) {
+                        if viewModel.isCompleted(topic) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(.green)
+                                .font(.caption)
+                                .padding(8)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
+                .swipeActions(edge: .leading) {
+                    Button {
+                        viewModel.toggleCompleted(topic)
+                    } label: {
+                        Label(viewModel.isCompleted(topic) ? "Mark Incomplete" : "Mark Complete", systemImage: "checkmark.seal")
+                    }
+                    .tint(.green)
+                }
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        viewModel.delete(topic)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
         }
         .listStyle(.plain)

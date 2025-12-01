@@ -9,9 +9,11 @@ final class ContentRepository: ObservableObject {
     private let diskStore: ContentDiskStore
     private var seedPackDTOs: [TopicPackDTO] = []
     private var userPackDTOs: [TopicPackDTO] = []
+    private let statusStore: TopicStatusStore
 
-    private init(diskStore: ContentDiskStore = ContentDiskStore()) {
+    private init(diskStore: ContentDiskStore = ContentDiskStore(), statusStore: TopicStatusStore = TopicStatusStore.shared) {
         self.diskStore = diskStore
+        self.statusStore = statusStore
         loadContent()
     }
 
@@ -53,11 +55,41 @@ final class ContentRepository: ObservableObject {
         return pack.toModel()
     }
 
+    func deleteTopic(_ topic: TopicPack) {
+        // Remove from user packs if present
+        if let index = userPackDTOs.firstIndex(where: { $0.id == topic.id }) {
+            userPackDTOs.remove(at: index)
+            diskStore.saveUserPacks(userPackDTOs)
+        }
+        // Always mark deleted to hide seed topics as well.
+        statusStore.markDeleted(topic.id)
+
+        let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
+        let loadedTopics = combined.compactMap { $0.toModel() }
+        topics = loadedTopics
+    }
+
+    func toggleCompleted(_ topic: TopicPack) {
+        statusStore.toggleCompleted(topic.id)
+        objectWillChange.send()
+    }
+
+    func isCompleted(_ topic: TopicPack) -> Bool {
+        statusStore.isCompleted(topic.id)
+    }
+
+    private func filteredForDeletion(_ dtos: [TopicPackDTO]) -> [TopicPackDTO] {
+        dtos.filter { !statusStore.isDeleted($0.id) }
+    }
+
     private func deduplicatedDTOs(seed: [TopicPackDTO], user: [TopicPackDTO]) -> [TopicPackDTO] {
         // Merge by id, user wins; then remove title duplicates (user title wins).
+        let seedFiltered = filteredForDeletion(seed)
+        let userFiltered = filteredForDeletion(user)
+
         var byID: [String: TopicPackDTO] = [:]
-        seed.forEach { byID[$0.id] = $0 }
-        user.forEach { byID[$0.id] = $0 }
+        seedFiltered.forEach { byID[$0.id] = $0 }
+        userFiltered.forEach { byID[$0.id] = $0 }
 
         var titleSet = Set<String>()
         var merged: [TopicPackDTO] = []
@@ -69,7 +101,7 @@ final class ContentRepository: ObservableObject {
         }
 
         // Order: user first, then remaining seeds.
-        let userIDs = Set(user.map { $0.id })
+        let userIDs = Set(userFiltered.map { $0.id })
         let users = merged.filter { userIDs.contains($0.id) }
         let seeds = merged.filter { !userIDs.contains($0.id) }
         return users + seeds

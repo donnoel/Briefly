@@ -48,4 +48,16 @@ final class LibraryViewModel: ObservableObject {
                 || topic.category.lowercased().contains(query)
         }
     }
+
+    func delete(_ topic: TopicPack) {
+        contentRepository.deleteTopic(topic)
+    }
+
+    func toggleCompleted(_ topic: TopicPack) {
+        contentRepository.toggleCompleted(topic)
+    }
+
+    func isCompleted(_ topic: TopicPack) -> Bool {
+        contentRepository.isCompleted(topic)
+    }
 }
