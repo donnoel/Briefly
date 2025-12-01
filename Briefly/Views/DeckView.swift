@@ -11,6 +11,12 @@ struct DeckView: View {
         return Double(viewModel.currentIndex + 1) / Double(viewModel.cards.count)
     }
 
+    private var headerProgressText: String? {
+        guard !viewModel.cards.isEmpty else { return nil }
+        if viewModel.isSectionComplete { return "Section complete" }
+        return "Card \(viewModel.currentIndex + 1) of \(viewModel.cards.count)"
+    }
+
     private var nextSection: TopicSection? {
         guard let currentIndex = viewModel.topic.sections.firstIndex(where: { $0.id == viewModel.section.id }) else {
             return nil
@@ -36,12 +42,8 @@ struct DeckView: View {
                 HStack(spacing: 8) {
                     ProgressView(value: progressFraction)
                         .progressViewStyle(.linear)
-                    if !viewModel.isSectionComplete {
-                        Text("Card \(viewModel.currentIndex + 1) of \(viewModel.cards.count)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Section complete")
+                    if let headerText = headerProgressText {
+                        Text(headerText)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
