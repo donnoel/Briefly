@@ -33,12 +33,6 @@ struct SettingsSheet: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.accentColor)
-                        Button(role: .destructive) {
-                            APIKeyStore.shared.apiKey = nil
-                            statusMessage = "Key removed."
-                        } label: {
-                            Image(systemName: "trash")
-                        }
                     }
                     Text(statusMessage ?? "Stored in Keychain.")
                         .font(.caption)
@@ -48,8 +42,13 @@ struct SettingsSheet: View {
                 Section("Model") {
                     Picker("Preferred Model", selection: $selectedModel) {
                         ForEach(modelOptions, id: \.id) { model in
-                            Text("\(model.id) — \(model.note)")
-                                .tag(model.id)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(model.id)
+                                Text(model.note)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .tag(model.id)
                         }
                     }
                     .pickerStyle(.navigationLink)
@@ -82,6 +81,14 @@ struct SettingsSheet: View {
                         SecureField("Enter or paste key", text: $pendingKey)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                        Button(role: .destructive) {
+                            APIKeyStore.shared.apiKey = nil
+                            statusMessage = "Key removed."
+                            pendingKey = ""
+                            showingKeyEntry = false
+                        } label: {
+                            Label("Clear Key", systemImage: "trash")
+                        }
                         Text("Keys are stored securely in the iOS Keychain.")
                             .font(.caption)
                             .foregroundColor(.secondary)
