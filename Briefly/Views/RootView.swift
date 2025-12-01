@@ -27,7 +27,8 @@ struct RootView: View {
                         viewModel: DeckSessionViewModel(
                             topic: topic,
                             section: section,
-                            progressStore: ProgressStore.shared
+                            progressStore: ProgressStore.shared,
+                            statusStore: TopicStatusStore.shared
                         )
                     )
                 }

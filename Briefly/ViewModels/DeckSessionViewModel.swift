@@ -11,17 +11,25 @@ final class DeckSessionViewModel: ObservableObject {
     @Published var isSectionComplete: Bool = false
 
     private let progressStore: ProgressStore
+    private let statusStore: TopicStatusStore
 
     var currentCard: Card? {
         guard cards.indices.contains(currentIndex), !isSectionComplete else { return nil }
         return cards[currentIndex]
     }
 
-    init(topic: TopicPack, section: TopicSection, progressStore: ProgressStore) {
+    init(
+        topic: TopicPack,
+        section: TopicSection,
+        progressStore: ProgressStore,
+        statusStore: TopicStatusStore = TopicStatusStore.shared
+    ) {
         self.topic = topic
         self.section = section
         self.cards = section.cards
         self.progressStore = progressStore
+        self.statusStore = statusStore
+        updateTopicCompletionIfNeeded()
     }
 
     // MARK: - Intent
@@ -50,6 +58,7 @@ final class DeckSessionViewModel: ObservableObject {
             isSectionComplete = true
             currentIndex = cards.count
             progressStore.markSectionCompleted(section)
+            updateTopicCompletionIfNeeded()
         }
     }
 
@@ -57,5 +66,14 @@ final class DeckSessionViewModel: ObservableObject {
         currentIndex = 0
         isShowingBack = false
         isSectionComplete = false
+    }
+
+    private func updateTopicCompletionIfNeeded() {
+        let allSectionsDone = topic.sections.allSatisfy { section in
+            progressStore.isSectionCompleted(section)
+        }
+        if allSectionsDone {
+            statusStore.markCompleted(topic.id)
+        }
     }
 }
