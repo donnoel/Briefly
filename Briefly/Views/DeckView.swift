@@ -36,9 +36,15 @@ struct DeckView: View {
                 HStack(spacing: 8) {
                     ProgressView(value: progressFraction)
                         .progressViewStyle(.linear)
-                    Text("Card \(viewModel.currentIndex + 1) of \(viewModel.cards.count)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if !viewModel.isSectionComplete {
+                        Text("Card \(viewModel.currentIndex + 1) of \(viewModel.cards.count)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Section complete")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .padding(.horizontal, 20)
