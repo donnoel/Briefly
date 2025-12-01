@@ -56,16 +56,20 @@ final class ContentRepository: ObservableObject {
 
         let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
         var loadedTopics = combined.compactMap { $0.toModel() }
-        applyOrdering(to: &loadedTopics)
-        if !loadedTopics.isEmpty {
-            // If new topic, insert at top of active list.
-            if let newTopic = pack.toModel(),
-               !topics.contains(where: { $0.id == newTopic.id }) {
-                let completed = loadedTopics.filter { statusStore.isCompleted($0.id) }
-                let active = loadedTopics.filter { !statusStore.isCompleted($0.id) }
-                topics = [newTopic] + active + completed
-                orderStore.saveOrder(for: ([newTopic] + active).map { $0.id })
-            } else {
+
+        let isNewTopic = !topics.contains(where: { $0.id == pack.id })
+        let newTopicModel = pack.toModel()
+
+        if isNewTopic, let newTopicModel {
+            // Build list without duplicating the new topic, and place it first in active list.
+            let withoutNew = loadedTopics.filter { $0.id != newTopicModel.id }
+            let active = withoutNew.filter { !statusStore.isCompleted($0.id) }
+            let completed = withoutNew.filter { statusStore.isCompleted($0.id) }
+            topics = [newTopicModel] + active + completed
+            orderStore.saveOrder(for: ([newTopicModel] + active).map { $0.id })
+        } else {
+            applyOrdering(to: &loadedTopics)
+            if !loadedTopics.isEmpty {
                 topics = loadedTopics
             }
         }

@@ -37,8 +37,8 @@ final class DeckSessionViewModel: ObservableObject {
     }
 
     func markReviewAndAdvance() {
-        // For now, "review" just advances without marking learned.
-        goToNextCard()
+        // Reset to front and stay on the same card so the user can review it again.
+        isShowingBack = false
     }
 
     private func goToNextCard() {
