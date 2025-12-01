@@ -6,12 +6,12 @@ struct SettingsSheet: View {
     @State private var statusMessage: String?
     @State private var selectedModel: String = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
 
-    private let modelOptions: [String] = [
-        "gpt-4.1-mini",
-        "gpt-4o-mini",
-        "gpt-4.1",
-        "gpt-4o",
-        "gpt-5.1"
+    private let modelOptions: [(id: String, note: String)] = [
+        ("gpt-4.1-mini", "Fastest/cheapest, good for most decks"),
+        ("gpt-4o-mini", "Fast, multimodal-lite"),
+        ("gpt-4.1", "Better quality, slower"),
+        ("gpt-4o", "Higher quality, slower"),
+        ("gpt-5.1", "Best quality, most expensive")
     ]
 
     var body: some View {
@@ -46,13 +46,25 @@ struct SettingsSheet: View {
 
                 Section("Model") {
                     Picker("Preferred Model", selection: $selectedModel) {
-                        ForEach(modelOptions, id: \.self) { model in
-                            Text(model).tag(model)
+                        ForEach(modelOptions, id: \.id) { model in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(model.id)
+                                Text(model.note)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .tag(model.id)
                         }
                     }
+                    .pickerStyle(.navigationLink)
                     .onChange(of: selectedModel) { newValue in
                         ModelPreferenceStore.shared.preferredModel = newValue
                         statusMessage = "Model set to \(newValue)."
+                    }
+                    if let note = selectedModelNote {
+                        Text(note)
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
                     }
                 }
 
@@ -78,5 +90,9 @@ struct SettingsSheet: View {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
         return "\(version) (\(build))"
+    }
+
+    private var selectedModelNote: String? {
+        modelOptions.first(where: { $0.id == selectedModel })?.note
     }
 }
