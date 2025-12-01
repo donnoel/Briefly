@@ -58,7 +58,16 @@ final class ContentRepository: ObservableObject {
         var loadedTopics = combined.compactMap { $0.toModel() }
         applyOrdering(to: &loadedTopics)
         if !loadedTopics.isEmpty {
-            topics = loadedTopics
+            // If new topic, insert at top of active list.
+            if let newTopic = pack.toModel(),
+               !topics.contains(where: { $0.id == newTopic.id }) {
+                let completed = loadedTopics.filter { statusStore.isCompleted($0.id) }
+                let active = loadedTopics.filter { !statusStore.isCompleted($0.id) }
+                topics = [newTopic] + active + completed
+                orderStore.saveOrder(for: ([newTopic] + active).map { $0.id })
+            } else {
+                topics = loadedTopics
+            }
         }
 
         return pack.toModel()
