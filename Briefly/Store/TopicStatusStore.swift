@@ -1,15 +1,16 @@
 import Foundation
+import Combine
 
 @MainActor
-final class TopicStatusStore {
+final class TopicStatusStore: ObservableObject {
     static let shared = TopicStatusStore()
 
     private let completedKey = "Briefly.completedTopicIDs"
     private let deletedKey = "Briefly.deletedTopicIDs"
     private let defaults: UserDefaults
 
-    private(set) var completedIDs: Set<String> = []
-    private(set) var deletedIDs: Set<String> = []
+    @Published private(set) var completedIDs: Set<String> = []
+    @Published private(set) var deletedIDs: Set<String> = []
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults

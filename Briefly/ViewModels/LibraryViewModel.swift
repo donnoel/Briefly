@@ -9,17 +9,31 @@ final class LibraryViewModel: ObservableObject {
 
     private let contentRepository: ContentRepository
     private let progressStore: ProgressStore
+    private let statusStore: TopicStatusStore
     private var cancellables = Set<AnyCancellable>()
 
-    init(contentRepository: ContentRepository, progressStore: ProgressStore) {
+    init(
+        contentRepository: ContentRepository,
+        progressStore: ProgressStore,
+        statusStore: TopicStatusStore = TopicStatusStore.shared
+    ) {
         self.contentRepository = contentRepository
         self.progressStore = progressStore
+        self.statusStore = statusStore
         self.topics = contentRepository.topics
 
         contentRepository.$topics
             .receive(on: DispatchQueue.main)
             .sink { [weak self] updated in
                 self?.topics = updated
+            }
+            .store(in: &cancellables)
+
+        statusStore.$completedIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.topics = self.topics
             }
             .store(in: &cancellables)
     }
