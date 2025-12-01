@@ -24,4 +24,8 @@ final class LibraryViewModel: ObservableObject {
     func progress(for topic: TopicPack) -> Double {
         progressStore.progress(for: topic)
     }
+
+    func refresh() {
+        topics = contentRepository.topics
+    }
 }

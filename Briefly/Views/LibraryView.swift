@@ -26,6 +26,9 @@ struct LibraryView: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
+        .refreshable {
+            viewModel.refresh()
+        }
         .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
