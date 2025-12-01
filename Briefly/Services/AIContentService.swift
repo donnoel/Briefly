@@ -5,9 +5,14 @@ final class AIContentService {
     enum ServiceError: Error {
         case decodingFailed
         case emptyResponse
+        case invalidResponse
     }
 
     private let client: OpenAIClient
+    private let maxSections = 3
+    private let maxCardsPerSection = 5
+    private let maxFrontLength = 160
+    private let maxBackLength = 260
 
     init(client: OpenAIClient) {
         self.client = client
@@ -23,10 +28,18 @@ final class AIContentService {
         let system = OpenAIChatMessage(
             role: "system",
             content: """
-            You are an expert at creating concise Q&A flashcards. Return JSON for a TopicPackDTO with:
+            You are an expert at creating concise Q&A flashcards.
+            Return ONLY valid JSON for a TopicPackDTO with fields:
             id, title, subtitle, category, difficulty (Beginner|Intermediate|Advanced),
-            estimatedMinutes, language, description, author, version, sections (with id, title, cards), and cards (id, front, back, tags).
-            Keep 2-3 sections, 3-5 cards each, terse wording, no markdown.
+            estimatedMinutes, language, description, author, version,
+            sections (id, title, cards),
+            cards (id, front, back, tags).
+            Constraints:
+            - 2 to 3 sections max.
+            - 3 to 5 cards per section.
+            - Question/front <= \(maxFrontLength) characters, Answer/back <= \(maxBackLength) characters.
+            - No markdown, no code fences, no extra text outside JSON.
+            - IDs must be unique and URL-safe (use snake_case).
             """
         )
 
@@ -45,7 +58,15 @@ final class AIContentService {
         }
 
         do {
-            return try JSONDecoder().decode(TopicPackDTO.self, from: content)
+            var dto = try JSONDecoder().decode(TopicPackDTO.self, from: content)
+            dto = dto.trimmed(
+                maxSections: maxSections,
+                maxCardsPerSection: maxCardsPerSection,
+                maxFrontLength: maxFrontLength,
+                maxBackLength: maxBackLength
+            )
+            guard dto.isValid() else { throw ServiceError.invalidResponse }
+            return dto
         } catch {
             throw ServiceError.decodingFailed
         }

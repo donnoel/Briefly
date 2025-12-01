@@ -71,4 +71,34 @@ struct TopicPackDTO: Codable, Hashable {
         let hasCards = sections.contains { !$0.cards.isEmpty }
         return hasCards
     }
+
+    func trimmed(
+        maxSections: Int,
+        maxCardsPerSection: Int,
+        maxFrontLength: Int,
+        maxBackLength: Int
+    ) -> TopicPackDTO {
+        let limitedSections = sections.prefix(maxSections).map { section in
+            let limitedCards = section.cards.prefix(maxCardsPerSection).map { card -> CardDTO in
+                let front = String(card.front.prefix(maxFrontLength))
+                let back = String(card.back.prefix(maxBackLength))
+                return CardDTO(id: card.id, front: front, back: back, source: card.source, tags: card.tags)
+            }
+            return TopicSectionDTO(id: section.id, title: section.title, cards: Array(limitedCards))
+        }
+
+        return TopicPackDTO(
+            id: id,
+            title: title,
+            subtitle: subtitle,
+            category: category,
+            difficulty: difficulty,
+            estimatedMinutes: estimatedMinutes,
+            language: language,
+            description: description,
+            author: author,
+            version: version,
+            sections: Array(limitedSections)
+        )
+    }
 }

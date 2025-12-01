@@ -127,13 +127,22 @@ struct AIGenerationSheet: View {
             } catch {
                 await MainActor.run {
                     isGenerating = false
-                    if let clientError = error as? OpenAIClient.ClientError {
-                        errorMessage = clientError.localizedDescription
-                    } else {
-                        errorMessage = "Error: \(error.localizedDescription)"
-                    }
+                    errorMessage = friendlyError(for: error)
                 }
             }
         }
+    }
+
+    private func friendlyError(for error: Error) -> String {
+        if let clientError = error as? OpenAIClient.ClientError {
+            return clientError.localizedDescription
+        }
+        if let serviceError = error as? AIContentService.ServiceError {
+            switch serviceError {
+            case .emptyResponse, .invalidResponse, .decodingFailed:
+                return "AI response was invalid. Try again with a clearer title."
+            }
+        }
+        return "Error: \(error.localizedDescription)"
     }
 }
