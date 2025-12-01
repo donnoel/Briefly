@@ -34,9 +34,11 @@ struct SettingsSheet: View {
                         .buttonStyle(.borderedProminent)
                         .tint(.accentColor)
                     }
-                    Text(statusMessage ?? "Stored in Keychain.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if let statusMessage {
+                        Text(statusMessage)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Section("Model") {
