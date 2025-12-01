@@ -31,7 +31,6 @@ struct LibraryView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .refreshable { viewModel.refresh() }
-        .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search topics")
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
         .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
@@ -46,6 +45,15 @@ struct LibraryView: View {
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 12) {
+                    Button {
+                        viewModel.pickRandomTopic { topic in
+                            coordinator.showTopic(topic)
+                        }
+                    } label: {
+                        Image(systemName: "sparkles.tv")
+                    }
+                    .accessibilityLabel("Surprise me")
+
                     Menu {
                         if !viewModel.availableCategories.isEmpty {
                             Picker("Category", selection: $viewModel.selectedCategory) {
@@ -82,6 +90,7 @@ struct LibraryView: View {
                 }
             }
         }
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search topics")
         .sheet(isPresented: $showingAIGenerator) {
             AIGenerationSheet(isPresented: $showingAIGenerator) { _ in }
         }

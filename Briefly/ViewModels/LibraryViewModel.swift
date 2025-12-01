@@ -70,6 +70,11 @@ final class LibraryViewModel: ObservableObject {
         filteredTopics.filter { isCompleted($0) }
     }
 
+    func pickRandomTopic(onPick: (TopicPack) -> Void) {
+        guard let random = filteredTopics.randomElement() else { return }
+        onPick(random)
+    }
+
     func delete(_ topic: TopicPack) {
         contentRepository.deleteTopic(topic)
     }
