@@ -121,12 +121,21 @@ final class ContentRepository: ObservableObject {
         seedFiltered.forEach { byID[$0.id] = $0 }
         userFiltered.forEach { byID[$0.id] = $0 }
 
-        var titleSet = Set<String>()
+        // Preserve stable ordering: user items first (in their current order), then seeds (in their current order).
         var merged: [TopicPackDTO] = []
-        for dto in byID.values {
+        var seenTitles = Set<String>()
+
+        for dto in userFiltered {
             let lower = dto.title.lowercased()
-            if titleSet.contains(lower) { continue }
-            titleSet.insert(lower)
+            if seenTitles.contains(lower) { continue }
+            seenTitles.insert(lower)
+            merged.append(dto)
+        }
+
+        for dto in seedFiltered {
+            let lower = dto.title.lowercased()
+            if seenTitles.contains(lower) { continue }
+            seenTitles.insert(lower)
             merged.append(dto)
         }
 
