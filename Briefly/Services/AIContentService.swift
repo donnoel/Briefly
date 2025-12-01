@@ -9,8 +9,8 @@ final class AIContentService {
     }
 
     private let client: OpenAIClient
-    private let maxSections = 3
-    private let maxCardsPerSection = 5
+    private let maxSectionsCap = 50
+    private let maxCardsPerSectionCap = 50
     private let maxFrontLength = 160
     private let maxBackLength = 260
 
@@ -23,8 +23,13 @@ final class AIContentService {
         title: String,
         difficulty: Difficulty,
         language: String = "en",
-        estimatedMinutes: Int = 20
+        estimatedMinutes: Int = 20,
+        targetSections: Int = 3,
+        targetCardsPerSection: Int = 5
     ) async throws -> TopicPackDTO {
+        let clampedSections = max(1, min(targetSections, maxSectionsCap))
+        let clampedCards = max(1, min(targetCardsPerSection, maxCardsPerSectionCap))
+
         let system = OpenAIChatMessage(
             role: "system",
             content: """
@@ -35,8 +40,8 @@ final class AIContentService {
             sections (id, title, cards),
             cards (id, front, back, tags).
             Constraints:
-            - 2 to 3 sections max.
-            - 3 to 5 cards per section.
+            - Up to \(clampedSections) sections (aim for this count).
+            - Up to \(clampedCards) cards per section (aim for this count).
             - Question/front <= \(maxFrontLength) characters, Answer/back <= \(maxBackLength) characters.
             - No markdown, no code fences, no extra text outside JSON.
             - IDs must be unique and URL-safe (use snake_case).
@@ -48,6 +53,7 @@ final class AIContentService {
             content: """
             Create a topic on "\(title)" for \(difficulty.rawValue.lowercased()) learners.
             Language: \(language). Target minutes: \(estimatedMinutes).
+            Aim for about \(clampedSections) sections with \(clampedCards) cards each.
             """
         )
 
@@ -60,8 +66,8 @@ final class AIContentService {
         do {
             var dto = try JSONDecoder().decode(TopicPackDTO.self, from: content)
             dto = dto.trimmed(
-                maxSections: maxSections,
-                maxCardsPerSection: maxCardsPerSection,
+                maxSections: clampedSections,
+                maxCardsPerSection: clampedCards,
                 maxFrontLength: maxFrontLength,
                 maxBackLength: maxBackLength
             )

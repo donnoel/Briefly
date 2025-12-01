@@ -9,6 +9,8 @@ struct AIGenerationSheet: View {
     @State private var estimatedMinutes: Int = 20
     @State private var language: String = "en"
     @State private var apiKey: String = APIKeyStore.shared.apiKey ?? ""
+    @State private var targetSections: Int = 3
+    @State private var targetCardsPerSection: Int = 5
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var pendingDTO: TopicPackDTO?
@@ -30,6 +32,18 @@ struct AIGenerationSheet: View {
                     TextField("Language (e.g., en, es)", text: $language)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                }
+
+                Section("Size (for AI generation)") {
+                    Stepper(value: $targetSections, in: 1...50) {
+                        Text("Sections: \(targetSections)")
+                    }
+                    Stepper(value: $targetCardsPerSection, in: 1...50) {
+                        Text("Cards per section: \(targetCardsPerSection)")
+                    }
+                    Text("For ~500 cards total, try 10 sections × 50 cards.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("OpenAI") {
@@ -110,7 +124,9 @@ struct AIGenerationSheet: View {
                     title: trimmedTitle,
                     difficulty: difficulty,
                     language: language,
-                    estimatedMinutes: estimatedMinutes
+                    estimatedMinutes: estimatedMinutes,
+                    targetSections: targetSections,
+                    targetCardsPerSection: targetCardsPerSection
                 )
                 guard dto.isValid() else {
                     await MainActor.run {
