@@ -59,4 +59,16 @@ struct TopicPackDTO: Codable, Hashable {
             sections: sections.map { $0.toModel() }
         )
     }
+
+    // Basic validation to guard against empty generations.
+    func isValid() -> Bool {
+        guard !id.isEmpty,
+              !title.isEmpty,
+              !subtitle.isEmpty,
+              !category.isEmpty,
+              !sections.isEmpty else { return false }
+
+        let hasCards = sections.contains { !$0.cards.isEmpty }
+        return hasCards
+    }
 }

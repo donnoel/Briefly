@@ -78,7 +78,7 @@ struct AIGenerationSheet: View {
                     GeneratedPackReviewView(
                         viewModel: GeneratedPackReviewViewModel(pack: dto),
                         onSave: { editedDTO in
-                            if let model = ContentRepository.shared.appendUserPack(editedDTO) {
+                            if let model = ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
                                 onSave(model)
                                 isPresented = false
                             } else {
@@ -112,6 +112,13 @@ struct AIGenerationSheet: View {
                     language: language,
                     estimatedMinutes: estimatedMinutes
                 )
+                guard dto.isValid() else {
+                    await MainActor.run {
+                        isGenerating = false
+                        errorMessage = "Generated content was incomplete. Try again."
+                    }
+                    return
+                }
                 await MainActor.run {
                     pendingDTO = dto
                     isGenerating = false

@@ -28,15 +28,24 @@ final class ContentRepository: ObservableObject {
     // MARK: - Mutation
 
     @discardableResult
-    func appendUserPack(_ pack: TopicPackDTO) -> TopicPack? {
-        userPackDTOs.append(pack)
+    func appendOrReplaceUserPack(_ pack: TopicPackDTO) -> TopicPack? {
+        guard pack.isValid() else { return nil }
+
+        if let existingIndex = userPackDTOs.firstIndex(where: { $0.id == pack.id }) {
+            userPackDTOs[existingIndex] = pack
+        } else if let titleIndex = userPackDTOs.firstIndex(where: {
+            $0.title.caseInsensitiveCompare(pack.title) == .orderedSame
+        }) {
+            userPackDTOs[titleIndex] = pack
+        } else {
+            userPackDTOs.insert(pack, at: 0)
+        }
+
         diskStore.saveUserPacks(userPackDTOs)
 
         let combined = seedPackDTOs + userPackDTOs
         let loadedTopics = combined.compactMap { $0.toModel() }
-        if let newTopic = pack.toModel() {
-            topics.append(newTopic)
-        } else if !loadedTopics.isEmpty {
+        if !loadedTopics.isEmpty {
             topics = loadedTopics
         }
 
