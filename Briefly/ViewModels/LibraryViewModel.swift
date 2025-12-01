@@ -70,11 +70,6 @@ final class LibraryViewModel: ObservableObject {
         filteredTopics.filter { isCompleted($0) }
     }
 
-    func pickRandomTopic(onPick: (TopicPack) -> Void) {
-        guard let random = filteredTopics.randomElement() else { return }
-        onPick(random)
-    }
-
     func delete(_ topic: TopicPack) {
         contentRepository.deleteTopic(topic)
     }
@@ -89,5 +84,62 @@ final class LibraryViewModel: ObservableObject {
 
     func moveActiveTopics(from source: IndexSet, to destination: Int) {
         contentRepository.reorderActiveTopics(from: source, to: destination)
+    }
+
+    func generateRandomTopic(
+        targetSections: Int = 3,
+        cardsPerSection: Int = 5
+    ) async throws -> TopicPack? {
+        guard let apiKey = APIKeyStore.shared.apiKey, !apiKey.isEmpty else {
+            throw RandomTopicError.missingAPIKey
+        }
+
+        let subjects = [
+            "ethical AI dilemmas",
+            "urban farming hacks",
+            "ancient architecture highlights",
+            "creative writing prompts",
+            "climate resilience basics",
+            "neuroscience curiosities",
+            "space exploration milestones",
+            "everyday mental models",
+            "productivity with focus",
+            "entrepreneurship pitfalls"
+        ]
+        let categories = ["Science", "Thinking", "Life", "Tech", "Creativity"]
+
+        let subject = subjects.randomElement() ?? "surprising ideas"
+        let category = categories.randomElement() ?? "General"
+        let difficulty = Difficulty.allCases.randomElement() ?? .beginner
+
+        let config = OpenAIClient.Configuration(
+            apiKeyProvider: { apiKey },
+            model: ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
+        )
+        let service = AIContentService(client: OpenAIClient(configuration: config))
+
+        let dto = try await service.generateTopicPack(
+            title: subject.capitalized,
+            difficulty: difficulty,
+            language: "en",
+            estimatedMinutes: 20,
+            targetSections: targetSections,
+            targetCardsPerSection: cardsPerSection
+        )
+
+        return await MainActor.run {
+            self.contentRepository.appendOrReplaceUserPack(dto)
+        }
+    }
+
+    enum RandomTopicError: LocalizedError {
+        case missingAPIKey
+
+        var errorDescription: String? {
+            switch self {
+            case .missingAPIKey:
+                return "Please set your OpenAI API key in Settings."
+            }
+        }
     }
 }

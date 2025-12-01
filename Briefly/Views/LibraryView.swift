@@ -6,6 +6,8 @@ struct LibraryView: View {
     @ObservedObject var viewModel: LibraryViewModel
     @State private var showingAIGenerator = false
     @State private var showingSettings = false
+    @State private var isGeneratingRandom = false
+    @State private var randomError: String?
 
     var body: some View {
         List {
@@ -46,12 +48,11 @@ struct LibraryView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 12) {
                     Button {
-                        viewModel.pickRandomTopic { topic in
-                            coordinator.showTopic(topic)
-                        }
+                        Task { await generateRandomTopic() }
                     } label: {
                         Image(systemName: "sparkles.tv")
                     }
+                    .disabled(isGeneratingRandom)
                     .accessibilityLabel("Surprise me")
 
                     Menu {
@@ -96,6 +97,29 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(isPresented: $showingSettings)
+        }
+        .alert("Generation failed", isPresented: Binding(
+            get: { randomError != nil },
+            set: { _ in randomError = nil }
+        )) {
+            Button("OK") { randomError = nil }
+        } message: {
+            Text(randomError ?? "")
+        }
+        .overlay(alignment: .top) {
+            if isGeneratingRandom {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Creating a topic for you…")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(10)
+                .background(
+                    Capsule().fill(.ultraThinMaterial)
+                )
+                .padding(.top, 8)
+            }
         }
     }
 
@@ -142,6 +166,25 @@ struct LibraryView: View {
                 }
             } label: {
                 Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private func generateRandomTopic() async {
+        guard !isGeneratingRandom else { return }
+        isGeneratingRandom = true
+        randomError = nil
+        defer { isGeneratingRandom = false }
+
+        do {
+            if let topic = try await viewModel.generateRandomTopic(targetSections: 3, cardsPerSection: 5) {
+                await MainActor.run {
+                    coordinator.showTopic(topic)
+                }
+            }
+        } catch {
+            await MainActor.run {
+                randomError = error.localizedDescription
             }
         }
     }
