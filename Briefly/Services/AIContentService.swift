@@ -23,7 +23,6 @@ final class AIContentService {
         title: String,
         difficulty: Difficulty,
         language: String = "en",
-        estimatedMinutes: Int = 20,
         targetSections: Int = 3,
         targetCardsPerSection: Int = 5
     ) async throws -> TopicPackDTO {
@@ -36,7 +35,7 @@ final class AIContentService {
             You are an expert at creating concise Q&A flashcards.
             Return ONLY valid JSON for a TopicPackDTO with fields:
             id, title, subtitle, category, difficulty (Beginner|Intermediate|Advanced),
-            estimatedMinutes, language, description, author, version,
+            language, description, author, version,
             sections (id, title, cards),
             cards (id, front, back, tags).
             Constraints:
@@ -52,7 +51,7 @@ final class AIContentService {
             role: "user",
             content: """
             Create a topic on "\(title)" for \(difficulty.rawValue.lowercased()) learners.
-            Language: \(language). Target minutes: \(estimatedMinutes).
+            Language: \(language).
             Aim for about \(clampedSections) sections with \(clampedCards) cards each.
             """
         )

@@ -7,7 +7,6 @@ final class GeneratedPackReviewViewModel: ObservableObject {
     @Published var subtitle: String
     @Published var category: String
     @Published var difficulty: Difficulty
-    @Published var estimatedMinutes: Int
     @Published var description: String
     @Published var sections: [EditableSection]
 
@@ -28,7 +27,6 @@ final class GeneratedPackReviewViewModel: ObservableObject {
         self.subtitle = pack.subtitle
         self.category = pack.category
         self.difficulty = Difficulty(rawValue: pack.difficulty) ?? .beginner
-        self.estimatedMinutes = pack.estimatedMinutes
         self.description = pack.description ?? ""
         self.sections = pack.sections.map { section in
             EditableSection(
@@ -48,7 +46,6 @@ final class GeneratedPackReviewViewModel: ObservableObject {
             subtitle: subtitle,
             category: category,
             difficulty: difficulty.rawValue,
-            estimatedMinutes: estimatedMinutes,
             language: original.language,
             description: description.isEmpty ? nil : description,
             author: original.author,

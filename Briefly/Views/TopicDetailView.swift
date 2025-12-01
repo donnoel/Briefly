@@ -27,10 +27,6 @@ struct TopicDetailView: View {
                         Label(viewModel.topic.difficulty.rawValue,
                               systemImage: "line.3.horizontal.decrease.circle")
                             .font(.caption)
-
-                        Label("\(viewModel.topic.estimatedMinutes) min",
-                              systemImage: "clock")
-                            .font(.caption)
                     }
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
 

@@ -122,7 +122,6 @@ final class LibraryViewModel: ObservableObject {
             title: subject.capitalized,
             difficulty: difficulty,
             language: "en",
-            estimatedMinutes: 20,
             targetSections: targetSections,
             targetCardsPerSection: cardsPerSection
         )

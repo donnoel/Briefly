@@ -17,9 +17,6 @@ struct GeneratedPackReviewView: View {
                         Text(difficulty.rawValue).tag(difficulty)
                     }
                 }
-                Stepper(value: $viewModel.estimatedMinutes, in: 5...120, step: 5) {
-                    Text("Estimated minutes: \(viewModel.estimatedMinutes)")
-                }
                 TextField("Description", text: $viewModel.description, axis: .vertical)
                     .lineLimit(1...3)
             }

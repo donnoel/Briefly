@@ -6,7 +6,6 @@ struct AIGenerationSheet: View {
 
     @State private var title: String = ""
     @State private var difficulty: Difficulty = .beginner
-    @State private var estimatedMinutes: Int = 20
     @State private var language: String = "en"
     @State private var targetSections: Int = 3
     @State private var targetCardsPerSection: Int = 5
@@ -37,9 +36,6 @@ struct AIGenerationSheet: View {
                         ForEach(Difficulty.allCases, id: \.self) { level in
                             Text(level.rawValue).tag(level)
                         }
-                    }
-                    Stepper(value: $estimatedMinutes, in: 5...90, step: 5) {
-                        Text("Estimated minutes: \(estimatedMinutes)")
                     }
                     Button {
                         generate()
@@ -140,7 +136,6 @@ struct AIGenerationSheet: View {
                         title: trimmedTitle,
                         difficulty: difficulty,
                         language: language,
-                        estimatedMinutes: estimatedMinutes,
                         targetSections: requestSections,
                         targetCardsPerSection: targetCardsPerSection
                     )
@@ -183,7 +178,6 @@ struct AIGenerationSheet: View {
                     subtitle: base.subtitle,
                     category: base.category,
                     difficulty: base.difficulty,
-                    estimatedMinutes: estimatedMinutes,
                     language: base.language,
                     description: base.description,
                     author: base.author,

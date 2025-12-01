@@ -24,6 +24,5 @@ struct TopicPack: Identifiable, Hashable {
     let subtitle: String
     let category: String
     let difficulty: Difficulty
-    let estimatedMinutes: Int
     let sections: [TopicSection]
 }

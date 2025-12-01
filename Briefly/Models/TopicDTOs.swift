@@ -37,7 +37,6 @@ struct TopicPackDTO: Codable, Hashable {
     let subtitle: String
     let category: String
     let difficulty: String
-    let estimatedMinutes: Int
     let language: String?
     let description: String?
     let author: String?
@@ -55,7 +54,6 @@ struct TopicPackDTO: Codable, Hashable {
             subtitle: subtitle,
             category: category,
             difficulty: difficultyEnum,
-            estimatedMinutes: estimatedMinutes,
             sections: sections.map { $0.toModel() }
         )
     }
@@ -93,7 +91,6 @@ struct TopicPackDTO: Codable, Hashable {
             subtitle: subtitle,
             category: category,
             difficulty: difficulty,
-            estimatedMinutes: estimatedMinutes,
             language: language,
             description: description,
             author: author,
