@@ -20,9 +20,9 @@ final class ContentRepository: ObservableObject {
     private func loadContent() {
         seedPackDTOs = diskStore.loadSeedPacks()
         userPackDTOs = diskStore.loadUserPacks()
-        let allDTOs = seedPackDTOs + userPackDTOs
+        let mergedDTOs = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
 
-        let loadedTopics = allDTOs.compactMap { $0.toModel() }
+        let loadedTopics = mergedDTOs.compactMap { $0.toModel() }
         topics = loadedTopics.isEmpty ? Self.sampleTopics : loadedTopics
     }
 
@@ -44,13 +44,35 @@ final class ContentRepository: ObservableObject {
 
         diskStore.saveUserPacks(userPackDTOs)
 
-        let combined = seedPackDTOs + userPackDTOs
+        let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
         let loadedTopics = combined.compactMap { $0.toModel() }
         if !loadedTopics.isEmpty {
             topics = loadedTopics
         }
 
         return pack.toModel()
+    }
+
+    private func deduplicatedDTOs(seed: [TopicPackDTO], user: [TopicPackDTO]) -> [TopicPackDTO] {
+        // Merge by id, user wins; then remove title duplicates (user title wins).
+        var byID: [String: TopicPackDTO] = [:]
+        seed.forEach { byID[$0.id] = $0 }
+        user.forEach { byID[$0.id] = $0 }
+
+        var titleSet = Set<String>()
+        var merged: [TopicPackDTO] = []
+        for dto in byID.values {
+            let lower = dto.title.lowercased()
+            if titleSet.contains(lower) { continue }
+            titleSet.insert(lower)
+            merged.append(dto)
+        }
+
+        // Order: user first, then remaining seeds.
+        let userIDs = Set(user.map { $0.id })
+        let users = merged.filter { userIDs.contains($0.id) }
+        let seeds = merged.filter { !userIDs.contains($0.id) }
+        return users + seeds
     }
 
     // MARK: - Sample Content

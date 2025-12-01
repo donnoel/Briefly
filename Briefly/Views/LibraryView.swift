@@ -8,27 +8,26 @@ struct LibraryView: View {
     @State private var showingSettings = false
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: BrieflyTheme.Layout.cardSpacing) {
-                ForEach(viewModel.topics) { topic in
-                    Button {
-                        coordinator.showTopic(topic)
-                    } label: {
-                        TopicCardView(
-                            topic: topic,
-                            progress: viewModel.progress(for: topic)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
+        List {
+            ForEach(viewModel.filteredTopics) { topic in
+                Button {
+                    coordinator.showTopic(topic)
+                } label: {
+                    TopicCardView(
+                        topic: topic,
+                        progress: viewModel.progress(for: topic)
+                    )
                 }
+                .buttonStyle(.plain)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
             }
-            .padding(.top, 12)
-            .padding(.bottom, 24)
         }
-        .refreshable {
-            viewModel.refresh()
-        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .refreshable { viewModel.refresh() }
+        .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search topics")
         .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -40,12 +39,41 @@ struct LibraryView: View {
                 .accessibilityLabel("Settings")
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingAIGenerator = true
-                } label: {
-                    Image(systemName: "sparkles")
+                HStack(spacing: 12) {
+                    Menu {
+                        if !viewModel.availableCategories.isEmpty {
+                            Picker("Category", selection: $viewModel.selectedCategory) {
+                                Text("All categories").tag(String?.none)
+                                ForEach(viewModel.availableCategories, id: \.self) { category in
+                                    Text(category).tag(String?.some(category))
+                                }
+                            }
+                        }
+
+                        Picker("Difficulty", selection: $viewModel.selectedDifficulty) {
+                            Text("All difficulties").tag(Difficulty?.none)
+                            ForEach(Difficulty.allCases, id: \.self) { level in
+                                Text(level.rawValue).tag(Difficulty?.some(level))
+                            }
+                        }
+
+                        Button("Clear filters") {
+                            viewModel.selectedCategory = nil
+                            viewModel.selectedDifficulty = nil
+                            viewModel.searchText = ""
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityLabel("Filters")
+
+                    Button {
+                        showingAIGenerator = true
+                    } label: {
+                        Image(systemName: "sparkles")
+                    }
+                    .accessibilityLabel("Generate with AI")
                 }
-                .accessibilityLabel("Generate with AI")
             }
         }
         .sheet(isPresented: $showingAIGenerator) {

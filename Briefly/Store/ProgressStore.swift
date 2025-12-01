@@ -1,12 +1,15 @@
 import Foundation
 import Combine
 
+@MainActor
 final class ProgressStore: ObservableObject {
     static let shared = ProgressStore()
 
     @Published private(set) var learnedCardIDs: Set<String> = []
 
     private let storageKey = "Briefly.learnedCardIDs"
+    private let saveDebounceInterval: TimeInterval = 0.5
+    private var pendingSaveWorkItem: DispatchWorkItem?
 
     private init() {
         load()
@@ -16,7 +19,7 @@ final class ProgressStore: ObservableObject {
 
     func markLearned(_ card: Card) {
         learnedCardIDs.insert(card.id)
-        save()
+        scheduleSave()
     }
 
     func isLearned(_ card: Card) -> Bool {
@@ -43,5 +46,24 @@ final class ProgressStore: ObservableObject {
     private func save() {
         let defaults = UserDefaults.standard
         defaults.set(Array(learnedCardIDs), forKey: storageKey)
+    }
+
+    private func scheduleSave() {
+        pendingSaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                self.save()
+            }
+        }
+        pendingSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + saveDebounceInterval, execute: workItem)
+    }
+
+    deinit {
+        pendingSaveWorkItem?.cancel()
+        Task { @MainActor in
+            self.save()
+        }
     }
 }
