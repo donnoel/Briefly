@@ -49,6 +49,14 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    var activeTopics: [TopicPack] {
+        filteredTopics.filter { !isCompleted($0) }
+    }
+
+    var completedTopics: [TopicPack] {
+        filteredTopics.filter { isCompleted($0) }
+    }
+
     func delete(_ topic: TopicPack) {
         contentRepository.deleteTopic(topic)
     }
