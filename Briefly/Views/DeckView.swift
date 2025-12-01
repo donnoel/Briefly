@@ -3,11 +3,20 @@ import SwiftUI
 struct DeckView: View {
     @ObservedObject var viewModel: DeckSessionViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var coordinator: AppCoordinator
 
     private var progressFraction: Double {
         guard !viewModel.cards.isEmpty else { return 0 }
         if viewModel.isSectionComplete { return 1.0 }
         return Double(viewModel.currentIndex + 1) / Double(viewModel.cards.count)
+    }
+
+    private var nextSection: TopicSection? {
+        guard let currentIndex = viewModel.topic.sections.firstIndex(where: { $0.id == viewModel.section.id }) else {
+            return nil
+        }
+        let nextIndex = currentIndex + 1
+        return viewModel.topic.sections.indices.contains(nextIndex) ? viewModel.topic.sections[nextIndex] : nil
     }
 
     var body: some View {
@@ -61,17 +70,25 @@ struct DeckView: View {
                         .font(.title3.bold())
                         .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
-                    Text("You’ve seen every card in this section. You can restart or head back to explore more topics.")
+                    Text("You’ve seen every card in this section. Restart or continue to the next section.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
 
+                    if let nextSection = nextSection {
+                        Button("Continue to \(nextSection.title)") {
+                            BrieflyHaptics.soft()
+                            coordinator.showDeck(for: viewModel.topic, section: nextSection)
+                        }
+                        .buttonStyle(BrieflyPrimaryButtonStyle())
+                    }
+
                     Button("Restart section") {
                         BrieflyHaptics.soft()
                         viewModel.restart()
                     }
-                    .buttonStyle(BrieflyPrimaryButtonStyle())
+                    .buttonStyle(BrieflySecondaryButtonStyle())
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
@@ -87,10 +104,10 @@ struct DeckView: View {
                 if viewModel.isShowingBack {
                     HStack(spacing: 16) {
                         Button {
-                            viewModel.markReviewAndAdvance()
-                        } label: {
-                            Text("Review again")
-                        }
+                        viewModel.markReviewAndAdvance()
+                    } label: {
+                        Text("Review again")
+                    }
                         .buttonStyle(BrieflySecondaryButtonStyle())
 
                         Button {
