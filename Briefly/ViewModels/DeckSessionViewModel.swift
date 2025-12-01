@@ -49,6 +49,7 @@ final class DeckSessionViewModel: ObservableObject {
         } else {
             isSectionComplete = true
             currentIndex = cards.count
+            progressStore.markSectionCompleted(section)
         }
     }
 

@@ -76,12 +76,22 @@ struct TopicDetailView: View {
                                         .font(.headline)
                                         .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
-                                    Text("\(section.cards.count) cards")
-                                        .font(.caption)
-                                        .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                                    HStack(spacing: 6) {
+                                        Text("\(section.cards.count) cards")
+                                        if viewModel.isSectionCompleted(section) {
+                                            Text("Completed · Try again")
+                                        }
+                                    }
+                                    .font(.caption)
+                                    .foregroundColor(BrieflyTheme.Colors.textSecondary)
                                 }
 
                                 Spacer()
+
+                                if viewModel.isSectionCompleted(section) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .foregroundColor(.green)
+                                }
 
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.semibold))

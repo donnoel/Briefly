@@ -9,8 +9,10 @@ final class ProgressStore: ObservableObject {
     static let shared = ProgressStore()
 
     @Published private(set) var learnedCardIDs: Set<String> = []
+    @Published private(set) var completedSectionIDs: Set<String> = []
 
     private let storageKey = "Briefly.learnedCardIDs"
+    private let sectionKey = "Briefly.completedSectionIDs"
     private let saveDebounceInterval: TimeInterval = 0.5
     private var pendingSaveWorkItem: DispatchWorkItem?
     private var backgroundObserver: NSObjectProtocol?
@@ -27,6 +29,11 @@ final class ProgressStore: ObservableObject {
         scheduleSave()
     }
 
+    func markSectionCompleted(_ section: TopicSection) {
+        completedSectionIDs.insert(section.id)
+        scheduleSave()
+    }
+
     func isLearned(_ card: Card) -> Bool {
         learnedCardIDs.contains(card.id)
     }
@@ -39,6 +46,10 @@ final class ProgressStore: ObservableObject {
         return Double(learnedCount) / Double(allCards.count)
     }
 
+    func isSectionCompleted(_ section: TopicSection) -> Bool {
+        completedSectionIDs.contains(section.id)
+    }
+
     // MARK: - Persistence
 
     private func load() {
@@ -46,11 +57,15 @@ final class ProgressStore: ObservableObject {
         if let array = defaults.array(forKey: storageKey) as? [String] {
             learnedCardIDs = Set(array)
         }
+        if let array = defaults.array(forKey: sectionKey) as? [String] {
+            completedSectionIDs = Set(array)
+        }
     }
 
     private func save() {
         let defaults = UserDefaults.standard
         defaults.set(Array(learnedCardIDs), forKey: storageKey)
+        defaults.set(Array(completedSectionIDs), forKey: sectionKey)
     }
 
     private func scheduleSave() {

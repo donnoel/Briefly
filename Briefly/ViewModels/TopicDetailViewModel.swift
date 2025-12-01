@@ -22,4 +22,8 @@ final class TopicDetailViewModel: ObservableObject {
         let percent = Int((fraction * 100).rounded())
         return "\(percent)% learned"
     }
+
+    func isSectionCompleted(_ section: TopicSection) -> Bool {
+        progressStore.isSectionCompleted(section)
+    }
 }
