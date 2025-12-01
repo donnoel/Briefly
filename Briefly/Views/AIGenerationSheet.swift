@@ -14,10 +14,23 @@ struct AIGenerationSheet: View {
     @State private var errorMessage: String?
     @State private var pendingDTO: TopicPackDTO?
     @State private var showingReview = false
+    @State private var progressFraction: Double = 0
+    @State private var progressText: String?
 
     var body: some View {
         NavigationStack {
             Form {
+                if isGenerating {
+                    Section {
+                        ProgressView(value: progressFraction)
+                        if let progressText {
+                            Text(progressText)
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
                 Section("Topic") {
                     TextField("Title or concept", text: $title)
                     Picker("Difficulty", selection: $difficulty) {
@@ -98,6 +111,8 @@ struct AIGenerationSheet: View {
 
         isGenerating = true
         errorMessage = nil
+        progressFraction = 0
+        progressText = "Starting…"
         APIKeyStore.shared.apiKey = apiKey
 
         let preferredModel = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
@@ -110,29 +125,71 @@ struct AIGenerationSheet: View {
 
         Task {
             do {
-                let dto = try await service.generateTopicPack(
-                    title: trimmedTitle,
-                    difficulty: difficulty,
-                    language: language,
+                let batchSize = max(1, min(targetSections, 5))
+                let totalBatches = max(1, Int(ceil(Double(targetSections) / Double(batchSize))))
+
+                var aggregatedSections: [TopicSectionDTO] = []
+                var baseDTO: TopicPackDTO?
+
+                for batch in 0..<totalBatches {
+                    let remaining = targetSections - aggregatedSections.count
+                    let requestSections = max(1, min(batchSize, remaining))
+
+                    let dto = try await service.generateTopicPack(
+                        title: trimmedTitle,
+                        difficulty: difficulty,
+                        language: language,
+                        estimatedMinutes: estimatedMinutes,
+                        targetSections: requestSections,
+                        targetCardsPerSection: targetCardsPerSection
+                    )
+
+                    if baseDTO == nil {
+                        baseDTO = dto
+                    }
+                    aggregatedSections.append(contentsOf: dto.sections)
+
+                    await MainActor.run {
+                        progressFraction = Double(batch + 1) / Double(totalBatches)
+                        progressText = "Generating batch \(batch + 1) of \(totalBatches)…"
+                    }
+                }
+
+                guard let base = baseDTO else { throw AIContentService.ServiceError.invalidResponse }
+
+                let finalDTO = TopicPackDTO(
+                    id: base.id,
+                    title: base.title,
+                    subtitle: base.subtitle,
+                    category: base.category,
+                    difficulty: base.difficulty,
                     estimatedMinutes: estimatedMinutes,
-                    targetSections: targetSections,
-                    targetCardsPerSection: targetCardsPerSection
+                    language: base.language,
+                    description: base.description,
+                    author: base.author,
+                    version: base.version,
+                    sections: aggregatedSections
                 )
-                guard dto.isValid() else {
+
+                guard finalDTO.isValid() else {
                     await MainActor.run {
                         isGenerating = false
+                        progressText = nil
                         errorMessage = "Generated content was incomplete. Try again."
                     }
                     return
                 }
+
                 await MainActor.run {
-                    pendingDTO = dto
+                    pendingDTO = finalDTO
                     isGenerating = false
+                    progressText = nil
                     showingReview = true
                 }
             } catch {
                 await MainActor.run {
                     isGenerating = false
+                    progressText = nil
                     errorMessage = friendlyError(for: error)
                 }
             }
