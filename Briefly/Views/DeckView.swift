@@ -98,9 +98,9 @@ struct DeckView: View {
                     }
                     .buttonStyle(BrieflySecondaryButtonStyle())
 
-                    Button("Back to topic") {
+                    Button("Back to topics") {
                         BrieflyHaptics.light()
-                        coordinator.popLast()
+                        coordinator.popToRoot()
                     }
                     .buttonStyle(.bordered)
                 }
