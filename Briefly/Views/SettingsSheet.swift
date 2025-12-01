@@ -48,13 +48,8 @@ struct SettingsSheet: View {
                 Section("Model") {
                     Picker("Preferred Model", selection: $selectedModel) {
                         ForEach(modelOptions, id: \.id) { model in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(model.id)
-                                Text(model.note)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(model.id)
+                            Text("\(model.id) — \(model.note)")
+                                .tag(model.id)
                         }
                     }
                     .pickerStyle(.navigationLink)
