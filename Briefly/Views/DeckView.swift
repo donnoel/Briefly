@@ -6,6 +6,7 @@ struct DeckView: View {
 
     private var progressFraction: Double {
         guard !viewModel.cards.isEmpty else { return 0 }
+        if viewModel.isSectionComplete { return 1.0 }
         return Double(viewModel.currentIndex + 1) / Double(viewModel.cards.count)
     }
 
