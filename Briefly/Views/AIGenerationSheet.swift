@@ -18,19 +18,6 @@ struct AIGenerationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Button {
-                        generate()
-                    } label: {
-                        if isGenerating {
-                            ProgressView()
-                        } else {
-                            Label("Generate with AI", systemImage: "sparkles")
-                        }
-                    }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
-                }
-
                 Section("Topic") {
                     TextField("Title or concept", text: $title)
                     Picker("Difficulty", selection: $difficulty) {
@@ -41,9 +28,16 @@ struct AIGenerationSheet: View {
                     Stepper(value: $estimatedMinutes, in: 5...90, step: 5) {
                         Text("Estimated minutes: \(estimatedMinutes)")
                     }
-                    TextField("Language (e.g., en, es)", text: $language)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    Button {
+                        generate()
+                    } label: {
+                        if isGenerating {
+                            ProgressView()
+                        } else {
+                            Label("Generate", systemImage: "sparkles")
+                        }
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
                 }
 
                 Section("Size") {
