@@ -3,15 +3,14 @@ import Combine
 
 struct RootView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
+    @StateObject private var libraryViewModel = LibraryViewModel(
+        contentRepository: ContentRepository.shared,
+        progressStore: ProgressStore.shared
+    )
 
     var body: some View {
         NavigationStack(path: $coordinator.path) {
-            LibraryView(
-                viewModel: LibraryViewModel(
-                    contentRepository: ContentRepository.shared,
-                    progressStore: ProgressStore.shared
-                )
-            )
+            LibraryView(viewModel: libraryViewModel)
             .navigationTitle("Briefly")
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: AppCoordinator.Route.self) { route in

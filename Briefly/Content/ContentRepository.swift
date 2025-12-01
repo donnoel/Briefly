@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class ContentRepository: ObservableObject {
     static let shared = ContentRepository()
 
