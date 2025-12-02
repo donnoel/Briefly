@@ -94,6 +94,9 @@ final class LibraryViewModel: ObservableObject {
             throw RandomTopicError.missingAPIKey
         }
 
+        let existingTitles = Set(topics.map { $0.title.lowercased() })
+        let existingIDs = Set(topics.map { $0.id.lowercased() })
+
         let subjects = [
             "ethical AI dilemmas",
             "urban farming hacks",
@@ -104,11 +107,26 @@ final class LibraryViewModel: ObservableObject {
             "space exploration milestones",
             "everyday mental models",
             "productivity with focus",
-            "entrepreneurship pitfalls"
+            "entrepreneurship pitfalls",
+            "marine biology curiosities",
+            "mythology snapshots",
+            "data privacy essentials",
+            "behavioral economics",
+            "cognitive biases",
+            "public speaking essentials",
+            "career pivots",
+            "philosophy sparks",
+            "design thinking"
         ]
         let categories = ["Science", "Thinking", "Life", "Tech", "Creativity"]
 
-        let subject = subjects.randomElement() ?? "surprising ideas"
+        var subject = subjects.randomElement() ?? "surprising ideas"
+        var attempts = 0
+        while existingTitles.contains(subject.lowercased()) && attempts < 5 {
+            subject = subjects.randomElement() ?? "surprising ideas"
+            attempts += 1
+        }
+
         let category = categories.randomElement() ?? "General"
         let difficulty = Difficulty.allCases.randomElement() ?? .beginner
 
@@ -127,7 +145,8 @@ final class LibraryViewModel: ObservableObject {
         )
 
         return await MainActor.run {
-            self.contentRepository.appendOrReplaceUserPack(dto)
+            let unique = makeUnique(dto: dto, existingIDs: existingIDs, existingTitles: existingTitles)
+            return self.contentRepository.appendOrReplaceUserPack(unique)
         }
     }
 
@@ -140,5 +159,35 @@ final class LibraryViewModel: ObservableObject {
                 return "Please set your OpenAI API key in Settings."
             }
         }
+    }
+
+    private func makeUnique(dto: TopicPackDTO, existingIDs: Set<String>, existingTitles: Set<String>) -> TopicPackDTO {
+        let baseID = dto.id.isEmpty ? UUID().uuidString : dto.id
+        var newID = baseID
+        var counter = 1
+        while existingIDs.contains(newID.lowercased()) {
+            newID = "\(baseID)_\(counter)"
+            counter += 1
+        }
+
+        var newTitle = dto.title
+        counter = 1
+        while existingTitles.contains(newTitle.lowercased()) {
+            newTitle = "\(dto.title) (\(counter))"
+            counter += 1
+        }
+
+        return TopicPackDTO(
+            id: newID,
+            title: newTitle,
+            subtitle: dto.subtitle,
+            category: dto.category,
+            difficulty: dto.difficulty,
+            language: dto.language,
+            description: dto.description,
+            author: dto.author,
+            version: dto.version,
+            sections: dto.sections
+        )
     }
 }
