@@ -15,6 +15,7 @@ struct AIGenerationSheet: View {
     @State private var showingReview = false
     @State private var progressFraction: Double = 0
     @State private var progressText: String?
+    @State private var generationTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -61,8 +62,10 @@ struct AIGenerationSheet: View {
             .navigationTitle("New Topic")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { isPresented = false }
-                        .disabled(isGenerating)
+                    Button("Close") {
+                        cancelGeneration()
+                        isPresented = false
+                    }
                 }
             }
             .alert(
@@ -75,6 +78,9 @@ struct AIGenerationSheet: View {
                 Button("OK") { errorMessage = nil }
             } message: {
                 Text(errorMessage ?? "Unknown error")
+            }
+            .onDisappear {
+                cancelGeneration()
             }
         }
         .sheet(isPresented: $showingReview) {
@@ -110,7 +116,7 @@ struct AIGenerationSheet: View {
         progressFraction = 0
         progressText = "Starting…"
         APIKeyStore.shared.apiKey = apiKey
-
+        cancelGeneration(resetUI: false)
         let preferredModel = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
         let configuration = OpenAIClient.Configuration(
             apiKeyProvider: { apiKey },
@@ -119,7 +125,7 @@ struct AIGenerationSheet: View {
         let client = OpenAIClient(configuration: configuration)
         let service = AIContentService(client: client)
 
-        Task {
+        generationTask = Task {
             do {
                 let batchSize = max(1, min(targetSections, 5))
                 let totalBatches = max(1, Int(ceil(Double(targetSections) / Double(batchSize))))
@@ -129,6 +135,7 @@ struct AIGenerationSheet: View {
                 var sectionCounter = 0
 
                 for batch in 0..<totalBatches {
+                    try Task.checkCancellation()
                     let remaining = targetSections - aggregatedSections.count
                     let requestSections = max(1, min(batchSize, remaining))
 
@@ -165,6 +172,7 @@ struct AIGenerationSheet: View {
                     }
 
                     await MainActor.run {
+                        guard !Task.isCancelled else { return }
                         progressFraction = Double(batch + 1) / Double(totalBatches)
                         progressText = "Generating batch \(batch + 1) of \(totalBatches)…"
                     }
@@ -195,18 +203,38 @@ struct AIGenerationSheet: View {
                 }
 
                 await MainActor.run {
+                    guard !Task.isCancelled else { return }
                     pendingDTO = finalDTO
                     isGenerating = false
                     progressText = nil
                     showingReview = true
+                }
+                await MainActor.run {
+                    generationTask = nil
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    isGenerating = false
+                    progressText = nil
+                    generationTask = nil
                 }
             } catch {
                 await MainActor.run {
                     isGenerating = false
                     progressText = nil
                     errorMessage = friendlyError(for: error)
+                    generationTask = nil
                 }
             }
+        }
+    }
+
+    private func cancelGeneration(resetUI: Bool = true) {
+        generationTask?.cancel()
+        generationTask = nil
+        if resetUI {
+            isGenerating = false
+            progressText = nil
         }
     }
 

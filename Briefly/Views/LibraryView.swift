@@ -192,6 +192,11 @@ struct LibraryView: View {
                 .padding(.top, 8)
             }
         }
+        .overlay {
+            if !hasTopics {
+                emptyState
+            }
+        }
     }
 
     @ViewBuilder
@@ -258,6 +263,37 @@ struct LibraryView: View {
                 randomError = error.localizedDescription
             }
         }
+    }
+
+    private var hasTopics: Bool {
+        !viewModel.activeTopics.isEmpty || !viewModel.completedTopics.isEmpty
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 40))
+                .foregroundColor(BrieflyTheme.Colors.accent)
+            Text("No topics yet")
+                .font(.headline)
+            Text("Generate a new topic with AI or set your OpenAI key in Settings.")
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 32)
+            HStack(spacing: 12) {
+                Button("Generate with AI") {
+                    showingAIGenerator = true
+                }
+                .buttonStyle(BrieflyPrimaryButtonStyle())
+                Button("Settings") {
+                    showingSettings = true
+                }
+                .buttonStyle(BrieflySecondaryButtonStyle())
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func chip(title: String, action: @escaping () -> Void) -> some View {
