@@ -70,10 +70,6 @@ final class LibraryViewModel: ObservableObject {
         filteredTopics.filter { isCompleted($0) }
     }
 
-    var featuredTopics: [TopicPack] {
-        Array(activeTopics.prefix(5))
-    }
-
     func delete(_ topic: TopicPack) {
         contentRepository.deleteTopic(topic)
     }
@@ -151,12 +147,6 @@ final class LibraryViewModel: ObservableObject {
         return await MainActor.run {
             let unique = makeUnique(dto: dto, existingIDs: existingIDs, existingTitles: existingTitles)
             return self.contentRepository.appendOrReplaceUserPack(unique)
-        }
-    }
-
-    func refreshFeaturedWithNewTopics(count: Int = 3) async {
-        for _ in 0..<count {
-            _ = try? await generateRandomTopic(targetSections: 3, cardsPerSection: 5)
         }
     }
 
