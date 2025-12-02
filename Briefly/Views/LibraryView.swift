@@ -35,7 +35,17 @@ struct LibraryView: View {
         .refreshable { viewModel.refresh() }
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
-        .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
+        .background(
+            LinearGradient(
+                colors: [
+                    BrieflyTheme.Colors.background(colorScheme),
+                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.2)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {

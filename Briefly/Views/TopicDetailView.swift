@@ -27,6 +27,13 @@ struct TopicDetailView: View {
                         Label(viewModel.topic.difficulty.rawValue,
                               systemImage: "line.3.horizontal.decrease.circle")
                             .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(BrieflyTheme.Colors.accentSoft(colorScheme))
+                            )
+                            .foregroundColor(BrieflyTheme.Colors.accent)
                     }
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
 
@@ -120,7 +127,17 @@ struct TopicDetailView: View {
             }
             .padding(.top, 12)
         }
-        .background(BrieflyTheme.Colors.background(colorScheme).ignoresSafeArea())
+        .background(
+            LinearGradient(
+                colors: [
+                    BrieflyTheme.Colors.background(colorScheme),
+                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.2)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .navigationTitle(viewModel.topic.title)
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -12,7 +12,7 @@ struct TopicCardView: View {
             // Title + subtitle
             VStack(alignment: .leading, spacing: 4) {
                 Text(topic.title)
-                    .font(.headline)
+                    .font(.headline.weight(.semibold))
                     .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
                 Text(topic.subtitle)
@@ -26,6 +26,12 @@ struct TopicCardView: View {
                 Label(topic.category, systemImage: "book.closed")
                     .font(.caption)
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(BrieflyTheme.Colors.accentSoft(colorScheme))
+                    )
 
                 Text(topic.difficulty.rawValue)
                     .font(.caption2.weight(.semibold))
@@ -54,7 +60,16 @@ struct TopicCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: BrieflyTheme.Layout.cardCornerRadius, style: .continuous)
-                .fill(BrieflyTheme.Colors.cardBackground(colorScheme))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.9),
+                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.6)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: BrieflyTheme.Layout.cardCornerRadius, style: .continuous)
                         .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
