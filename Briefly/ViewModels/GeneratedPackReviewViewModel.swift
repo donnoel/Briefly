@@ -6,7 +6,7 @@ final class GeneratedPackReviewViewModel: ObservableObject {
     @Published var title: String
     @Published var subtitle: String
     @Published var category: String
-    @Published var difficulty: Difficulty
+    let difficulty: Difficulty
     @Published var description: String
     @Published var sections: [EditableSection]
 

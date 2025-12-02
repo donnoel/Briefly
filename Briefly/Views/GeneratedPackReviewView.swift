@@ -12,10 +12,11 @@ struct GeneratedPackReviewView: View {
                 TextField("Title", text: $viewModel.title)
                 TextField("Subtitle", text: $viewModel.subtitle)
                 TextField("Category", text: $viewModel.category)
-                Picker("Difficulty", selection: $viewModel.difficulty) {
-                    ForEach(Difficulty.allCases, id: \.self) { difficulty in
-                        Text(difficulty.rawValue).tag(difficulty)
-                    }
+                HStack {
+                    Text("Difficulty")
+                    Spacer()
+                    Text(viewModel.difficulty.rawValue)
+                        .foregroundColor(.secondary)
                 }
                 TextField("Description", text: $viewModel.description, axis: .vertical)
                     .lineLimit(1...3)
