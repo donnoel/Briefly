@@ -239,10 +239,6 @@ struct LibraryView: View {
                     showingAIGenerator = true
                 }
                 .buttonStyle(BrieflyPrimaryButtonStyle())
-                Button("Settings") {
-                    showingSettings = true
-                }
-                .buttonStyle(BrieflySecondaryButtonStyle())
             }
             .padding(.top, 4)
         }
