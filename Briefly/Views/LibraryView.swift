@@ -51,6 +51,7 @@ struct LibraryView: View {
                         Task { await generateRandomTopic() }
                     } label: {
                         Image(systemName: "sparkles.tv")
+                            .symbolEffect(.pulse.byLayer, isActive: isGeneratingRandom)
                     }
                     .disabled(isGeneratingRandom)
                     .accessibilityLabel("Surprise me")
@@ -78,7 +79,7 @@ struct LibraryView: View {
                             viewModel.searchText = ""
                         }
                     } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
+                        Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                     }
                     .accessibilityLabel("Filters")
 
@@ -143,7 +144,7 @@ struct LibraryView: View {
         }
         .buttonStyle(.plain)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
         .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
         .transition(.asymmetric(
             insertion: .opacity.combined(with: .move(edge: .top)),

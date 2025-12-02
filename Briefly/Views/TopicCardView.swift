@@ -12,11 +12,11 @@ struct TopicCardView: View {
             // Title + subtitle
             VStack(alignment: .leading, spacing: 4) {
                 Text(topic.title)
-                    .font(.headline)           // primary label
+                    .font(.headline)
                     .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
                 Text(topic.subtitle)
-                    .font(.subheadline)        // secondary label
+                    .font(.subheadline)
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
                     .lineLimit(2)
             }
@@ -24,13 +24,13 @@ struct TopicCardView: View {
             // Metadata chips
             HStack(spacing: 8) {
                 Label(topic.category, systemImage: "book.closed")
-                    .font(.caption)            // metadata text
+                    .font(.caption)
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
 
                 Text(topic.difficulty.rawValue)
                     .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
                     .background(
                         Capsule()
                             .fill(BrieflyTheme.Colors.accentSoft(colorScheme))
