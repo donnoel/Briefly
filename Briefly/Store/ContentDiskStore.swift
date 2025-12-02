@@ -6,6 +6,20 @@ final class ContentDiskStore {
     private let userFilename = "user_content.json"
     private let seedResourceName = "seed_content"
 
+    enum DiskError: LocalizedError {
+        case userDirectoryUnavailable
+        case writeFailed(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .userDirectoryUnavailable:
+                return "Unable to access documents directory."
+            case .writeFailed(let error):
+                return "Failed to save your topics: \(error.localizedDescription)"
+            }
+        }
+    }
+
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
@@ -26,8 +40,8 @@ final class ContentDiskStore {
 
     // MARK: - Saving
 
-    func saveUserPacks(_ packs: [TopicPackDTO]) {
-        guard let url = userContentURL() else { return }
+    func saveUserPacks(_ packs: [TopicPackDTO]) throws {
+        guard let url = userContentURL() else { throw DiskError.userDirectoryUnavailable }
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -37,8 +51,7 @@ final class ContentDiskStore {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
         } catch {
-            // In this first pass we silently fail; later we can surface errors to the UI.
-            print("ContentDiskStore saveUserPacks failed: \(error)")
+            throw DiskError.writeFailed(error)
         }
     }
 

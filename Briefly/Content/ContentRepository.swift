@@ -39,8 +39,9 @@ final class ContentRepository: ObservableObject {
     // MARK: - Mutation
 
     @discardableResult
-    func appendOrReplaceUserPack(_ pack: TopicPackDTO) -> TopicPack? {
+    func appendOrReplaceUserPack(_ pack: TopicPackDTO) throws -> TopicPack? {
         guard pack.isValid() else { return nil }
+        let originalUserPacks = userPackDTOs
 
         if let existingIndex = userPackDTOs.firstIndex(where: { $0.id == pack.id }) {
             userPackDTOs[existingIndex] = pack
@@ -52,7 +53,12 @@ final class ContentRepository: ObservableObject {
             userPackDTOs.insert(pack, at: 0)
         }
 
-        diskStore.saveUserPacks(userPackDTOs)
+        do {
+            try diskStore.saveUserPacks(userPackDTOs)
+        } catch {
+            userPackDTOs = originalUserPacks
+            throw error
+        }
 
         let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
         var loadedTopics = combined.compactMap { $0.toModel() }
@@ -77,11 +83,17 @@ final class ContentRepository: ObservableObject {
         return pack.toModel()
     }
 
-    func deleteTopic(_ topic: TopicPack) {
+    func deleteTopic(_ topic: TopicPack) throws {
+        let originalUserPacks = userPackDTOs
         // Remove from user packs if present
         if let index = userPackDTOs.firstIndex(where: { $0.id == topic.id }) {
             userPackDTOs.remove(at: index)
-            diskStore.saveUserPacks(userPackDTOs)
+            do {
+                try diskStore.saveUserPacks(userPackDTOs)
+            } catch {
+                userPackDTOs = originalUserPacks
+                throw error
+            }
         }
         // Always mark deleted to hide seed topics as well.
         statusStore.markDeleted(topic.id)

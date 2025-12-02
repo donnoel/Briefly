@@ -70,8 +70,8 @@ final class LibraryViewModel: ObservableObject {
         filteredTopics.filter { isCompleted($0) }
     }
 
-    func delete(_ topic: TopicPack) {
-        contentRepository.deleteTopic(topic)
+    func delete(_ topic: TopicPack) throws {
+        try contentRepository.deleteTopic(topic)
     }
 
     func toggleCompleted(_ topic: TopicPack) {
@@ -144,9 +144,9 @@ final class LibraryViewModel: ObservableObject {
             targetCardsPerSection: cardsPerSection
         )
 
-        return await MainActor.run {
+        return try await MainActor.run {
             let unique = makeUnique(dto: dto, existingIDs: existingIDs, existingTitles: existingTitles)
-            return self.contentRepository.appendOrReplaceUserPack(unique)
+            return try self.contentRepository.appendOrReplaceUserPack(unique)
         }
     }
 

@@ -8,6 +8,7 @@ struct LibraryView: View {
     @State private var showingSettings = false
     @State private var isGeneratingRandom = false
     @State private var randomError: String?
+    @State private var libraryError: String?
 
     var body: some View {
         List {
@@ -117,6 +118,14 @@ struct LibraryView: View {
         } message: {
             Text(randomError ?? "")
         }
+        .alert("Save failed", isPresented: Binding(
+            get: { libraryError != nil },
+            set: { _ in libraryError = nil }
+        )) {
+            Button("OK") { libraryError = nil }
+        } message: {
+            Text(libraryError ?? "")
+        }
         .overlay(alignment: .top) {
             if isGeneratingRandom {
                 HStack(spacing: 8) {
@@ -178,7 +187,11 @@ struct LibraryView: View {
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 withAnimation {
-                    viewModel.delete(topic)
+                    do {
+                        try viewModel.delete(topic)
+                    } catch {
+                        libraryError = error.localizedDescription
+                    }
                 }
             } label: {
                 Label("Delete", systemImage: "trash")

@@ -89,11 +89,15 @@ struct AIGenerationSheet: View {
                     GeneratedPackReviewView(
                         viewModel: GeneratedPackReviewViewModel(pack: dto),
                         onSave: { editedDTO in
-                            if let model = ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
-                                onSave(model)
-                                isPresented = false
-                            } else {
-                                errorMessage = "Edited content could not be parsed."
+                            do {
+                                if let model = try ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
+                                    onSave(model)
+                                    isPresented = false
+                                } else {
+                                    errorMessage = "Edited content could not be parsed."
+                                }
+                            } catch {
+                                errorMessage = error.localizedDescription
                             }
                         },
                         originalDTO: dto
