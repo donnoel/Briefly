@@ -7,8 +7,8 @@ struct AIGenerationSheet: View {
     @State private var title: String = ""
     @State private var difficulty: Difficulty = .beginner
     @State private var language: String = "en"
-    @State private var targetSections: Int = 3
-    @State private var targetCardsPerSection: Int = 5
+    @State private var targetSections: Int = 5
+    @State private var targetCardsPerSection: Int = 10
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var pendingDTO: TopicPackDTO?
@@ -59,7 +59,7 @@ struct AIGenerationSheet: View {
                     }
                 }
             }
-            .navigationTitle("New Topic")
+            .navigationTitle("Fresh Topics")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
