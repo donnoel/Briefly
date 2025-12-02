@@ -87,8 +87,8 @@ final class LibraryViewModel: ObservableObject {
     }
 
     func generateRandomTopic(
-        targetSections: Int = 3,
-        cardsPerSection: Int = 5
+        targetSections: Int = 5,
+        cardsPerSection: Int = 10
     ) async throws -> TopicPack? {
         guard let apiKey = APIKeyStore.shared.apiKey, !apiKey.isEmpty else {
             throw RandomTopicError.missingAPIKey
@@ -120,11 +120,11 @@ final class LibraryViewModel: ObservableObject {
         ]
         let categories = ["Science", "Thinking", "Life", "Tech", "Creativity"]
 
-        var subject = subjects.randomElement() ?? "surprising ideas"
-        var attempts = 0
-        while existingTitles.contains(subject.lowercased()) && attempts < 5 {
-            subject = subjects.randomElement() ?? "surprising ideas"
-            attempts += 1
+        // Pick a subject the user doesn't already have. If all are taken, synthesize a new one.
+        let unseenSubjects = subjects.filter { !existingTitles.contains($0.lowercased()) }
+        var subject = unseenSubjects.randomElement() ?? "surprise topic"
+        if existingTitles.contains(subject.lowercased()) {
+            subject = "surprise topic \(UUID().uuidString.prefix(6))"
         }
 
         let category = categories.randomElement() ?? "General"

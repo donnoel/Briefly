@@ -206,7 +206,7 @@ struct LibraryView: View {
         defer { isGeneratingRandom = false }
 
         do {
-            if let topic = try await viewModel.generateRandomTopic(targetSections: 3, cardsPerSection: 5) {
+            if let topic = try await viewModel.generateRandomTopic(targetSections: 5, cardsPerSection: 10) {
                 await MainActor.run {
                     coordinator.showTopic(topic)
                 }
