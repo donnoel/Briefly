@@ -20,15 +20,32 @@ struct AIGenerationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                if isGenerating {
-                    Section {
-                        ProgressView(value: progressFraction)
-                        if let progressText {
-                            Text(progressText)
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
+                Section {
+                    Button {
+                        generate()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isGenerating {
+                                ProgressView()
+                                Text("Generating…")
+                                    .font(.headline)
+                            } else {
+                                Image(systemName: "sparkles")
+                                Text("Generate Topic")
+                                    .font(.headline)
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.accentColor)
+                        )
+                        .foregroundColor(.white)
                     }
+                    .buttonStyle(.plain)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
+                    .opacity((title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating) ? 0.6 : 1)
                 }
 
                 Section("Topic") {
@@ -38,16 +55,6 @@ struct AIGenerationSheet: View {
                             Text(level.rawValue).tag(level)
                         }
                     }
-                    Button {
-                        generate()
-                    } label: {
-                        if isGenerating {
-                            ProgressView()
-                        } else {
-                            Label("Generate", systemImage: "sparkles")
-                        }
-                    }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
                 }
 
                 Section("Size") {
