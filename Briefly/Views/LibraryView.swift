@@ -229,7 +229,7 @@ struct LibraryView: View {
                 .foregroundColor(BrieflyTheme.Colors.accent)
             Text("No topics yet")
                 .font(.headline)
-            Text("Generate a new topic with AI or set your OpenAI key in Settings.")
+            Text("Generate a new topic with AI.")
                 .font(.footnote)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
@@ -238,11 +238,13 @@ struct LibraryView: View {
                 Button("Generate with AI") {
                     showingAIGenerator = true
                 }
-                .buttonStyle(BrieflyPrimaryButtonStyle())
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
             }
             .padding(.top, 4)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .offset(y: -60)
     }
 
     private func chip(title: String, action: @escaping () -> Void) -> some View {
