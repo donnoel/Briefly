@@ -11,8 +11,6 @@ struct RootView: View {
     var body: some View {
         NavigationStack(path: $coordinator.path) {
             LibraryView(viewModel: libraryViewModel)
-            .navigationTitle("Briefly")
-            .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: AppCoordinator.Route.self) { route in
                 switch route {
                 case .topic(let topic):

@@ -60,7 +60,10 @@ struct LibraryView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .refreshable { viewModel.refresh() }
+        .refreshable {
+            viewModel.refresh()
+            Task { await viewModel.refreshFeaturedWithNewTopics(count: 3) }
+        }
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
         .background(
@@ -74,6 +77,7 @@ struct LibraryView: View {
             )
             .ignoresSafeArea()
         )
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {

@@ -154,6 +154,12 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    func refreshFeaturedWithNewTopics(count: Int = 3) async {
+        for _ in 0..<count {
+            _ = try? await generateRandomTopic(targetSections: 3, cardsPerSection: 5)
+        }
+    }
+
     enum RandomTopicError: LocalizedError {
         case missingAPIKey
 
