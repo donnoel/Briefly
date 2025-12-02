@@ -22,41 +22,21 @@ struct CardView: View {
                     y: 10
                 )
 
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 18) {
                 Text(isShowingBack ? "Answer" : "Question")
                     .font(.caption.bold())
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
 
                 Text(isShowingBack ? card.back : card.front)
-                    .font(.title3) // main learning content
+                    .font(.title2.weight(.semibold))
                     .foregroundColor(BrieflyTheme.Colors.textPrimary)
                     .multilineTextAlignment(.leading)
-
-                Spacer()
-
-                if !isShowingBack {
-                    Button {
-                        revealAction()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "eye")
-                                .font(.footnote)
-                            Text("Tap to see answer")
-                                .font(.footnote)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.22))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
             }
-            .padding(20)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 28)
         }
-        .frame(maxWidth: .infinity, minHeight: 260, maxHeight: 340)
+        .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 360)
         .animation(.easeInOut(duration: 0.18), value: isShowingBack)
     }
 }
