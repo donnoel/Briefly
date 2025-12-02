@@ -51,7 +51,16 @@ struct TopicDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: BrieflyTheme.Layout.cardCornerRadius, style: .continuous)
-                        .fill(BrieflyTheme.Colors.cardBackground(colorScheme))
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    BrieflyTheme.Colors.cardBackground(colorScheme),
+                                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.4)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .overlay(
                             RoundedRectangle(cornerRadius: BrieflyTheme.Layout.cardCornerRadius, style: .continuous)
                                 .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))

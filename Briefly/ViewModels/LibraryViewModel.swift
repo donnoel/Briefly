@@ -70,6 +70,10 @@ final class LibraryViewModel: ObservableObject {
         filteredTopics.filter { isCompleted($0) }
     }
 
+    var featuredTopics: [TopicPack] {
+        Array(activeTopics.prefix(5))
+    }
+
     func delete(_ topic: TopicPack) {
         contentRepository.deleteTopic(topic)
     }

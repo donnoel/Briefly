@@ -11,6 +11,34 @@ struct LibraryView: View {
 
     var body: some View {
         List {
+            if !viewModel.featuredTopics.isEmpty {
+                Section {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(viewModel.featuredTopics) { topic in
+                                Button {
+                                    coordinator.showTopic(topic)
+                                } label: {
+                                    TopicCardView(
+                                        topic: topic,
+                                        progress: viewModel.progress(for: topic)
+                                    )
+                                    .frame(width: 280)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text("Featured")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .textCase(nil)
+                }
+            }
+
             if !viewModel.activeTopics.isEmpty {
                 Section("Active") {
                     ForEach(viewModel.activeTopics) { topic in
@@ -103,6 +131,34 @@ struct LibraryView: View {
             }
         }
         .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search topics")
+        .safeAreaInset(edge: .top, alignment: .center) {
+            if !viewModel.availableCategories.isEmpty || !Difficulty.allCases.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        if !viewModel.availableCategories.isEmpty {
+                            chip(title: viewModel.selectedCategory ?? "All categories") {
+                                if viewModel.selectedCategory == nil {
+                                    viewModel.selectedCategory = viewModel.availableCategories.first
+                                } else {
+                                    viewModel.selectedCategory = nil
+                                }
+                            }
+                        }
+
+                        chip(title: viewModel.selectedDifficulty?.rawValue ?? "All levels") {
+                            if viewModel.selectedDifficulty == nil {
+                                viewModel.selectedDifficulty = Difficulty.allCases.first
+                            } else {
+                                viewModel.selectedDifficulty = nil
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+                .background(.ultraThinMaterial)
+            }
+        }
         .sheet(isPresented: $showingAIGenerator) {
             AIGenerationSheet(isPresented: $showingAIGenerator) { _ in }
         }
@@ -198,5 +254,19 @@ struct LibraryView: View {
                 randomError = error.localizedDescription
             }
         }
+    }
+
+    private func chip(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule().fill(BrieflyTheme.Colors.accentSoft(colorScheme))
+                )
+                .foregroundColor(BrieflyTheme.Colors.accent)
+        }
+        .buttonStyle(.plain)
     }
 }
