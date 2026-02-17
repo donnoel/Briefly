@@ -136,17 +136,54 @@ final class LibraryViewModel: ObservableObject {
         )
         let service = AIContentService(client: OpenAIClient(configuration: config))
 
-        let dto = try await service.generateTopicPack(
+        // Progressive strategy: request sections in two smaller batches concurrently, then merge.
+        let firstTarget = min(targetSections, 3)
+        let secondTarget = max(targetSections - firstTarget, 0)
+
+        async let firstCall = service.generateTopicPack(
             title: subject.capitalized,
             difficulty: difficulty,
             language: "en",
-            targetSections: targetSections,
+            targetSections: firstTarget,
             targetCardsPerSection: cardsPerSection
         )
 
+        async let secondCall: TopicPackDTO? = secondTarget > 0 ? service.generateTopicPack(
+            title: subject.capitalized,
+            difficulty: difficulty,
+            language: "en",
+            targetSections: secondTarget,
+            targetCardsPerSection: cardsPerSection
+        ) : nil
+
+        // Await both calls before persisting to ensure all-or-nothing saves.
+        let firstDTO = try await firstCall
+        let secondDTO = try await secondCall
+
+        // Choose the final pack ID/title before normalizing IDs to avoid collisions.
+        let uniqueBase = makeUnique(dto: firstDTO, existingIDs: existingIDs, existingTitles: existingTitles)
+        let baseID = uniqueBase.id
+        let baseTitle = uniqueBase.title
+
+        var normalizedBase = normalize(
+            dto: uniqueBase,
+            baseID: baseID,
+            baseTitle: baseTitle,
+            sectionStartIndex: 0
+        )
+
+        if let secondDTO {
+            let normalizedSecond = normalize(
+                dto: secondDTO,
+                baseID: baseID,
+                baseTitle: baseTitle,
+                sectionStartIndex: normalizedBase.sections.count
+            )
+            normalizedBase = mergeSections(into: normalizedBase, additionalSections: normalizedSecond.sections)
+        }
+
         return try await MainActor.run {
-            let unique = makeUnique(dto: dto, existingIDs: existingIDs, existingTitles: existingTitles)
-            return try self.contentRepository.appendOrReplaceUserPack(unique)
+            try self.contentRepository.appendOrReplaceUserPack(normalizedBase)
         }
     }
 
@@ -188,6 +225,60 @@ final class LibraryViewModel: ObservableObject {
             author: dto.author,
             version: dto.version,
             sections: dto.sections
+        )
+    }
+
+    private func normalize(
+        dto: TopicPackDTO,
+        baseID: String,
+        baseTitle: String,
+        sectionStartIndex: Int
+    ) -> TopicPackDTO {
+        var sectionCounter = sectionStartIndex
+        let normalizedSections: [TopicSectionDTO] = dto.sections.map { section in
+            let sectionID = "\(baseID)_section_\(sectionCounter)"
+            defer { sectionCounter += 1 }
+            var cardCounter = 0
+            let cards = section.cards.map { card in
+                let cardID = "\(sectionID)_card_\(cardCounter)"
+                cardCounter += 1
+                return CardDTO(
+                    id: cardID,
+                    front: card.front,
+                    back: card.back,
+                    source: card.source,
+                    tags: card.tags
+                )
+            }
+            return TopicSectionDTO(id: sectionID, title: section.title, cards: cards)
+        }
+
+        return TopicPackDTO(
+            id: baseID,
+            title: baseTitle,
+            subtitle: dto.subtitle,
+            category: dto.category,
+            difficulty: dto.difficulty,
+            language: dto.language,
+            description: dto.description,
+            author: dto.author,
+            version: dto.version,
+            sections: normalizedSections
+        )
+    }
+
+    private func mergeSections(into dto: TopicPackDTO, additionalSections: [TopicSectionDTO]) -> TopicPackDTO {
+        TopicPackDTO(
+            id: dto.id,
+            title: dto.title,
+            subtitle: dto.subtitle,
+            category: dto.category,
+            difficulty: dto.difficulty,
+            language: dto.language,
+            description: dto.description,
+            author: dto.author,
+            version: dto.version,
+            sections: dto.sections + additionalSections
         )
     }
 }

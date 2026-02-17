@@ -40,10 +40,19 @@ final class OpenAIClient {
 
     private let config: Configuration
     private let urlSession: URLSession
+    private static let requestTimeout: TimeInterval = 20
 
-    init(configuration: Configuration, urlSession: URLSession = .shared) {
+    init(configuration: Configuration, urlSession: URLSession? = nil) {
         self.config = configuration
-        self.urlSession = urlSession
+        if let urlSession {
+            self.urlSession = urlSession
+        } else {
+            let sessionConfig = URLSessionConfiguration.ephemeral
+            sessionConfig.timeoutIntervalForRequest = Self.requestTimeout
+            sessionConfig.timeoutIntervalForResource = Self.requestTimeout
+            sessionConfig.waitsForConnectivity = false
+            self.urlSession = URLSession(configuration: sessionConfig)
+        }
     }
 
     func chatCompletion(
@@ -67,8 +76,15 @@ final class OpenAIClient {
             response_format: responseFormat
         )
 
-        request.httpBody = try JSONEncoder().encode(payload)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        request.httpBody = try encoder.encode(payload)
 
+        return try await performWithRetry(request: request)
+    }
+
+    private func performWithRetry(request: URLRequest, attempt: Int = 0) async throws -> OpenAIChatResponse {
+        let maxAttempts = 2
         do {
             let (data, response) = try await urlSession.data(for: request)
             guard let http = response as? HTTPURLResponse else {
@@ -76,6 +92,10 @@ final class OpenAIClient {
             }
             guard (200..<300).contains(http.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? ""
+                if attempt + 1 < maxAttempts {
+                    try await Task.sleep(nanoseconds: 300_000_000) // 0.3s backoff
+                    return try await performWithRetry(request: request, attempt: attempt + 1)
+                }
                 print("OpenAI error \(http.statusCode): \(body)")
                 throw ClientError.badResponse(status: http.statusCode, body: body)
             }
@@ -87,6 +107,10 @@ final class OpenAIClient {
             print("OpenAI decode error: \(decodingError)")
             throw ClientError.decodingFailed
         } catch {
+            if attempt + 1 < maxAttempts {
+                try await Task.sleep(nanoseconds: 300_000_000)
+                return try await performWithRetry(request: request, attempt: attempt + 1)
+            }
             throw ClientError.transport(error)
         }
     }

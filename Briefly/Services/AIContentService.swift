@@ -11,8 +11,8 @@ final class AIContentService {
     private let client: OpenAIClient
     private let maxSectionsCap = 50
     private let maxCardsPerSectionCap = 50
-    private let maxFrontLength = 160
-    private let maxBackLength = 260
+    private let maxFrontLength = 140
+    private let maxBackLength = 220
 
     init(client: OpenAIClient) {
         self.client = client
@@ -58,16 +58,29 @@ final class AIContentService {
         )
 
         let response = try await client.chatCompletion(messages: [system, user])
+        let contentData = response.choices.first?.message.content.data(using: .utf8)
 
-        guard let content = response.choices.first?.message.content.data(using: .utf8) else {
+        guard let content = contentData else {
             throw ServiceError.emptyResponse
         }
 
+        return try decodeDTO(
+            from: content,
+            maxSections: clampedSections,
+            maxCardsPerSection: clampedCards
+        )
+    }
+
+    private func decodeDTO(
+        from data: Data,
+        maxSections: Int,
+        maxCardsPerSection: Int
+    ) throws -> TopicPackDTO {
         do {
-            var dto = try JSONDecoder().decode(TopicPackDTO.self, from: content)
+            var dto = try JSONDecoder().decode(TopicPackDTO.self, from: data)
             dto = dto.trimmed(
-                maxSections: clampedSections,
-                maxCardsPerSection: clampedCards,
+                maxSections: maxSections,
+                maxCardsPerSection: maxCardsPerSection,
                 maxFrontLength: maxFrontLength,
                 maxBackLength: maxBackLength
             )
