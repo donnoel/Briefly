@@ -40,6 +40,11 @@ final class TopicStatusStore: ObservableObject {
         save()
     }
 
+    func unmarkDeleted(_ id: String) {
+        guard deletedIDs.remove(id) != nil else { return }
+        save()
+    }
+
     func isDeleted(_ id: String) -> Bool {
         deletedIDs.contains(id)
     }

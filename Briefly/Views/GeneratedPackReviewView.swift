@@ -3,7 +3,7 @@ import SwiftUI
 struct GeneratedPackReviewView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: GeneratedPackReviewViewModel
-    let onSave: (TopicPackDTO) -> Void
+    let onSave: (TopicPackDTO) -> Bool
     let originalDTO: TopicPackDTO
 
     var body: some View {
@@ -46,8 +46,10 @@ struct GeneratedPackReviewView: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    onSave(viewModel.toDTO(original: originalDTO))
-                    dismiss()
+                    let didSave = onSave(viewModel.toDTO(original: originalDTO))
+                    if didSave {
+                        dismiss()
+                    }
                 }
             }
         }

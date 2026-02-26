@@ -100,11 +100,14 @@ struct AIGenerationSheet: View {
                                 if let model = try ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
                                     onSave(model)
                                     isPresented = false
+                                    return true
                                 } else {
                                     errorMessage = "Edited content could not be parsed."
+                                    return false
                                 }
                             } catch {
                                 errorMessage = error.localizedDescription
+                                return false
                             }
                         },
                         originalDTO: dto

@@ -7,14 +7,14 @@ final class ContentRepository: ObservableObject {
     static let shared = ContentRepository()
 
     @Published private(set) var topics: [TopicPack] = []
-    private let diskStore: ContentDiskStore
+    private let diskStore: any ContentDiskStoring
     private var seedPackDTOs: [TopicPackDTO] = []
     private var userPackDTOs: [TopicPackDTO] = []
     private let statusStore: TopicStatusStore
     private let orderStore: TopicOrderStore
 
-    private init(
-        diskStore: ContentDiskStore = ContentDiskStore(),
+    init(
+        diskStore: any ContentDiskStoring = ContentDiskStore(),
         statusStore: TopicStatusStore = TopicStatusStore.shared,
         orderStore: TopicOrderStore = TopicOrderStore.shared
     ) {
@@ -41,6 +41,10 @@ final class ContentRepository: ObservableObject {
     @discardableResult
     func appendOrReplaceUserPack(_ pack: TopicPackDTO) throws -> TopicPack? {
         guard pack.isValid() else { return nil }
+        let wasDeleted = statusStore.isDeleted(pack.id)
+        if wasDeleted {
+            statusStore.unmarkDeleted(pack.id)
+        }
         let originalUserPacks = userPackDTOs
 
         if let existingIndex = userPackDTOs.firstIndex(where: { $0.id == pack.id }) {
@@ -57,6 +61,9 @@ final class ContentRepository: ObservableObject {
             try diskStore.saveUserPacks(userPackDTOs)
         } catch {
             userPackDTOs = originalUserPacks
+            if wasDeleted {
+                statusStore.markDeleted(pack.id)
+            }
             throw error
         }
 
@@ -99,8 +106,13 @@ final class ContentRepository: ObservableObject {
         statusStore.markDeleted(topic.id)
 
         let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
-        let loadedTopics = combined.compactMap { $0.toModel() }
-        topics = loadedTopics
+        var loadedTopics = combined.compactMap { $0.toModel() }
+        applyOrdering(to: &loadedTopics)
+        topics = loadedTopics.isEmpty ? Self.sampleTopics : loadedTopics
+        let activeIDs = loadedTopics
+            .filter { !statusStore.isCompleted($0.id) }
+            .map(\.id)
+        orderStore.saveOrder(for: activeIDs)
     }
 
     func toggleCompleted(_ topic: TopicPack) {
@@ -125,37 +137,32 @@ final class ContentRepository: ObservableObject {
     }
 
     private func deduplicatedDTOs(seed: [TopicPackDTO], user: [TopicPackDTO]) -> [TopicPackDTO] {
-        // Merge by id, user wins; then remove title duplicates (user title wins).
+        // Merge by id first (user wins), then remove title duplicates (user title wins).
         let seedFiltered = filteredForDeletion(seed)
         let userFiltered = filteredForDeletion(user)
 
-        var byID: [String: TopicPackDTO] = [:]
-        seedFiltered.forEach { byID[$0.id] = $0 }
-        userFiltered.forEach { byID[$0.id] = $0 }
+        var resolvedByID: [String: TopicPackDTO] = [:]
+        seedFiltered.forEach { resolvedByID[$0.id.lowercased()] = $0 }
+        userFiltered.forEach { resolvedByID[$0.id.lowercased()] = $0 }
 
-        // Preserve stable ordering: user items first (in their current order), then seeds (in their current order).
+        var orderedByID: [TopicPackDTO] = []
+        var seenIDs = Set<String>()
+        for dto in userFiltered + seedFiltered {
+            let idKey = dto.id.lowercased()
+            guard !seenIDs.contains(idKey), let resolved = resolvedByID[idKey] else { continue }
+            seenIDs.insert(idKey)
+            orderedByID.append(resolved)
+        }
+
         var merged: [TopicPackDTO] = []
         var seenTitles = Set<String>()
-
-        for dto in userFiltered {
-            let lower = dto.title.lowercased()
-            if seenTitles.contains(lower) { continue }
-            seenTitles.insert(lower)
+        for dto in orderedByID {
+            let titleKey = dto.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !seenTitles.contains(titleKey) else { continue }
+            seenTitles.insert(titleKey)
             merged.append(dto)
         }
-
-        for dto in seedFiltered {
-            let lower = dto.title.lowercased()
-            if seenTitles.contains(lower) { continue }
-            seenTitles.insert(lower)
-            merged.append(dto)
-        }
-
-        // Order: user first, then remaining seeds.
-        let userIDs = Set(userFiltered.map { $0.id })
-        let users = merged.filter { userIDs.contains($0.id) }
-        let seeds = merged.filter { !userIDs.contains($0.id) }
-        return users + seeds
+        return merged
     }
 
     private func applyOrdering(to topicModels: inout [TopicPack]) {

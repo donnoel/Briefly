@@ -1,7 +1,13 @@
 import Foundation
 
+protocol ContentDiskStoring {
+    func loadSeedPacks() -> [TopicPackDTO]
+    func loadUserPacks() -> [TopicPackDTO]
+    func saveUserPacks(_ packs: [TopicPackDTO]) throws
+}
+
 /// Reads/writes topic packs to disk so AI-generated or edited content can persist.
-final class ContentDiskStore {
+final class ContentDiskStore: ContentDiskStoring {
     private let fileManager: FileManager
     private let userFilename = "user_content.json"
     private let seedResourceName = "seed_content"
