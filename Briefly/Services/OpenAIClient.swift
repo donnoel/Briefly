@@ -6,15 +6,18 @@ final class OpenAIClient {
         let apiKeyProvider: () -> String?
         let model: String
         let baseURL: URL
+        let timeout: TimeInterval
 
         init(
             apiKeyProvider: @escaping () -> String?,
             model: String = "gpt-4.1-mini",
-            baseURL: URL = URL(string: "https://api.openai.com/v1")!
+            baseURL: URL = URL(string: "https://api.openai.com/v1")!,
+            timeout: TimeInterval = 60
         ) {
             self.apiKeyProvider = apiKeyProvider
             self.model = model
             self.baseURL = baseURL
+            self.timeout = timeout
         }
     }
 
@@ -22,6 +25,7 @@ final class OpenAIClient {
         case missingAPIKey
         case badResponse(status: Int, body: String)
         case decodingFailed
+        case requestTimedOut
         case transport(Error)
 
         var errorDescription: String? {
@@ -32,6 +36,8 @@ final class OpenAIClient {
                 return "OpenAI responded with status \(status): \(body)"
             case .decodingFailed:
                 return "Failed to decode OpenAI response."
+            case .requestTimedOut:
+                return "Request timed out. Try again, or reduce sections/cards per section."
             case .transport(let error):
                 return "Network error: \(error.localizedDescription)"
             }
@@ -40,7 +46,6 @@ final class OpenAIClient {
 
     private let config: Configuration
     private let urlSession: URLSession
-    private static let requestTimeout: TimeInterval = 20
 
     init(configuration: Configuration, urlSession: URLSession? = nil) {
         self.config = configuration
@@ -48,9 +53,9 @@ final class OpenAIClient {
             self.urlSession = urlSession
         } else {
             let sessionConfig = URLSessionConfiguration.ephemeral
-            sessionConfig.timeoutIntervalForRequest = Self.requestTimeout
-            sessionConfig.timeoutIntervalForResource = Self.requestTimeout
-            sessionConfig.waitsForConnectivity = false
+            sessionConfig.timeoutIntervalForRequest = configuration.timeout
+            sessionConfig.timeoutIntervalForResource = configuration.timeout
+            sessionConfig.waitsForConnectivity = true
             self.urlSession = URLSession(configuration: sessionConfig)
         }
     }
@@ -84,7 +89,7 @@ final class OpenAIClient {
     }
 
     private func performWithRetry(request: URLRequest, attempt: Int = 0) async throws -> OpenAIChatResponse {
-        let maxAttempts = 2
+        let maxAttempts = 3
         do {
             let (data, response) = try await urlSession.data(for: request)
             guard let http = response as? HTTPURLResponse else {
@@ -93,7 +98,8 @@ final class OpenAIClient {
             guard (200..<300).contains(http.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? ""
                 if attempt + 1 < maxAttempts {
-                    try await Task.sleep(nanoseconds: 300_000_000) // 0.3s backoff
+                    let delayNanos = UInt64((Double(attempt) + 1) * 400_000_000)
+                    try await Task.sleep(nanoseconds: delayNanos)
                     return try await performWithRetry(request: request, attempt: attempt + 1)
                 }
                 print("OpenAI error \(http.statusCode): \(body)")
@@ -106,9 +112,17 @@ final class OpenAIClient {
         } catch let decodingError as DecodingError {
             print("OpenAI decode error: \(decodingError)")
             throw ClientError.decodingFailed
+        } catch let urlError as URLError where urlError.code == .timedOut {
+            if attempt + 1 < maxAttempts {
+                let delayNanos = UInt64((Double(attempt) + 1) * 400_000_000)
+                try await Task.sleep(nanoseconds: delayNanos)
+                return try await performWithRetry(request: request, attempt: attempt + 1)
+            }
+            throw ClientError.requestTimedOut
         } catch {
             if attempt + 1 < maxAttempts {
-                try await Task.sleep(nanoseconds: 300_000_000)
+                let delayNanos = UInt64((Double(attempt) + 1) * 400_000_000)
+                try await Task.sleep(nanoseconds: delayNanos)
                 return try await performWithRetry(request: request, attempt: attempt + 1)
             }
             throw ClientError.transport(error)
