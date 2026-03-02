@@ -55,7 +55,7 @@ final class OpenAIClient {
             let sessionConfig = URLSessionConfiguration.ephemeral
             sessionConfig.timeoutIntervalForRequest = configuration.timeout
             sessionConfig.timeoutIntervalForResource = configuration.timeout
-            sessionConfig.waitsForConnectivity = true
+            sessionConfig.waitsForConnectivity = false
             self.urlSession = URLSession(configuration: sessionConfig)
         }
     }
@@ -97,9 +97,8 @@ final class OpenAIClient {
             }
             guard (200..<300).contains(http.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? ""
-                if attempt + 1 < maxAttempts {
-                    let delayNanos = UInt64((Double(attempt) + 1) * 400_000_000)
-                    try await Task.sleep(nanoseconds: delayNanos)
+                if attempt + 1 < maxAttempts, shouldRetry(statusCode: http.statusCode) {
+                    try await Task.sleep(nanoseconds: retryDelayNanoseconds(for: attempt))
                     return try await performWithRetry(request: request, attempt: attempt + 1)
                 }
                 print("OpenAI error \(http.statusCode): \(body)")
@@ -113,20 +112,28 @@ final class OpenAIClient {
             print("OpenAI decode error: \(decodingError)")
             throw ClientError.decodingFailed
         } catch let urlError as URLError where urlError.code == .timedOut {
-            if attempt + 1 < maxAttempts {
-                let delayNanos = UInt64((Double(attempt) + 1) * 400_000_000)
-                try await Task.sleep(nanoseconds: delayNanos)
-                return try await performWithRetry(request: request, attempt: attempt + 1)
-            }
             throw ClientError.requestTimedOut
-        } catch {
-            if attempt + 1 < maxAttempts {
-                let delayNanos = UInt64((Double(attempt) + 1) * 400_000_000)
-                try await Task.sleep(nanoseconds: delayNanos)
+        } catch let urlError as URLError {
+            if attempt + 1 < maxAttempts, shouldRetry(urlError: urlError) {
+                try await Task.sleep(nanoseconds: retryDelayNanoseconds(for: attempt))
                 return try await performWithRetry(request: request, attempt: attempt + 1)
             }
+            throw ClientError.transport(urlError)
+        } catch {
             throw ClientError.transport(error)
         }
+    }
+
+    private func shouldRetry(statusCode: Int) -> Bool {
+        statusCode == 429 || (500...599).contains(statusCode)
+    }
+
+    private func shouldRetry(urlError: URLError) -> Bool {
+        urlError.code == .networkConnectionLost
+    }
+
+    private func retryDelayNanoseconds(for attempt: Int) -> UInt64 {
+        UInt64((Double(attempt) + 1) * 400_000_000)
     }
 }
 
