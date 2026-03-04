@@ -53,10 +53,11 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 - Tap a section to start a deck session.
 
 ### Deck Session
-- Tap **See answer** to reveal the back.
+- Tap the card (or **See answer**) to reveal the back with a flip animation.
 - After revealing:
   - **Got it** marks the card learned and advances
   - **Review again** queues it for another pass
+- The section view includes a study header with section/card progress.
 - When a section finishes, you can restart or continue to the next section.
 
 ### AI Generation

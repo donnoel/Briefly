@@ -15,28 +15,90 @@ struct CardView: View {
                     ? BrieflyTheme.Colors.cardGradientBack(colorScheme)
                     : BrieflyTheme.Colors.cardGradientFront(colorScheme)
                 )
-                .shadow(
-                    color: BrieflyTheme.Colors.shadowSoft(colorScheme),
-                    radius: 14,
-                    x: 0,
-                    y: 10
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
                 )
 
-            VStack(alignment: .leading, spacing: 18) {
-                Text(isShowingBack ? "Answer" : "Question")
-                    .font(.caption.bold())
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(BrieflyTheme.Colors.cardHighlight(colorScheme), lineWidth: 1.5)
+                .blur(radius: 0.2)
+                .padding(1)
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Question")
+                    .font(.caption.weight(.bold))
                     .foregroundColor(BrieflyTheme.Colors.textSecondary)
 
-                Text(isShowingBack ? card.back : card.front)
-                    .font(.title2.weight(.semibold))
-                    .foregroundColor(BrieflyTheme.Colors.textPrimary)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
+                ScrollView(.vertical, showsIndicators: false) {
+                    Text(card.front)
+                        .font(.title2.weight(.semibold))
+                        .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
             }
+            .opacity(isShowingBack ? 0 : 1)
             .padding(.horizontal, 24)
             .padding(.vertical, 28)
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Answer")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(BrieflyTheme.Colors.textSecondary)
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    Text(card.back)
+                        .font(.title2.weight(.semibold))
+                        .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            }
+            .opacity(isShowingBack ? 1 : 0)
+            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+            .padding(.horizontal, 24)
+            .padding(.vertical, 28)
+
+            if !isShowingBack {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Label("Tap to reveal", systemImage: "hand.tap")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.88))
+                            )
+                    }
+                }
+                .padding(16)
+                .transition(.opacity)
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 360)
-        .animation(.easeInOut(duration: 0.18), value: isShowingBack)
+        .compositingGroup()
+        .rotation3DEffect(
+            .degrees(isShowingBack ? 180 : 0),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.75
+        )
+        .shadow(
+            color: BrieflyTheme.Colors.shadowSoft(colorScheme),
+            radius: 16,
+            x: 0,
+            y: 10
+        )
+        .frame(maxWidth: .infinity, minHeight: 360, maxHeight: 480)
+        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .onTapGesture {
+            if !isShowingBack {
+                revealAction()
+            }
+        }
+        .animation(.spring(response: 0.42, dampingFraction: 0.84), value: isShowingBack)
     }
 }
