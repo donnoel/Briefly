@@ -2,7 +2,7 @@ import Foundation
 
 protocol ContentDiskStoring {
     func loadSeedPacks() -> [TopicPackDTO]
-    func loadUserPacks() -> [TopicPackDTO]
+    func loadUserPacks() throws -> [TopicPackDTO]
     func saveUserPacks(_ packs: [TopicPackDTO]) throws
 }
 
@@ -13,11 +13,14 @@ final class ContentDiskStore: ContentDiskStoring {
     private let seedResourceName = "seed_content"
 
     enum DiskError: LocalizedError {
+        case readFailed(Error)
         case userDirectoryUnavailable
         case writeFailed(Error)
 
         var errorDescription: String? {
             switch self {
+            case .readFailed(let error):
+                return "Failed to load your saved topics: \(error.localizedDescription)"
             case .userDirectoryUnavailable:
                 return "Unable to access documents directory."
             case .writeFailed(let error):
@@ -36,12 +39,22 @@ final class ContentDiskStore: ContentDiskStoring {
         guard let url = Bundle.main.url(forResource: seedResourceName, withExtension: "json") else {
             return []
         }
-        return load(from: url)
+        do {
+            return try decodePacks(from: url)
+        } catch {
+            assertionFailure("Failed to load seed packs: \(error)")
+            return []
+        }
     }
 
-    func loadUserPacks() -> [TopicPackDTO] {
+    func loadUserPacks() throws -> [TopicPackDTO] {
         guard let url = userContentURL() else { return [] }
-        return load(from: url)
+        guard fileManager.fileExists(atPath: url.path) else { return [] }
+        do {
+            return try decodePacks(from: url)
+        } catch {
+            throw DiskError.readFailed(error)
+        }
     }
 
     // MARK: - Saving
@@ -63,15 +76,10 @@ final class ContentDiskStore: ContentDiskStoring {
 
     // MARK: - Helpers
 
-    private func load(from url: URL) -> [TopicPackDTO] {
-        do {
-            let data = try Data(contentsOf: url)
-            let decoder = JSONDecoder()
-            return try decoder.decode([TopicPackDTO].self, from: data)
-        } catch {
-            print("ContentDiskStore load failed for \(url.lastPathComponent): \(error)")
-            return []
-        }
+    private func decodePacks(from url: URL) throws -> [TopicPackDTO] {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        return try decoder.decode([TopicPackDTO].self, from: data)
     }
 
     private func userContentURL() -> URL? {

@@ -80,10 +80,74 @@ struct ContentRepositoryTests {
         #expect(relaunch.topics.map(\.id) == ["beta", "gamma"])
     }
 
-    private func makeRepository(disk: InMemoryDiskStore, defaults: UserDefaults) -> ContentRepository {
+    @Test
+    func loadFailureBlocksMutationsInsteadOfOverwritingUserData() {
+        let defaults = makeIsolatedDefaults()
+        let disk = InMemoryDiskStore(seed: [], user: [], loadUserError: ContentDiskStore.DiskError.readFailed(URLError(.cannotDecodeRawData)))
+        let repo = makeRepository(disk: disk, defaults: defaults)
+
+        do {
+            _ = try repo.appendOrReplaceUserPack(makeDTO(id: "new_topic", title: "New Topic"))
+            #expect(false)
+            return
+        } catch let error as ContentRepository.RepositoryError {
+            guard case .userContentUnavailable = error else {
+                #expect(false)
+                return
+            }
+        } catch {
+            #expect(false)
+            return
+        }
+
+        #expect(disk.saveCallCount == 0)
+        #expect(repo.topics.isEmpty)
+    }
+
+    @Test
+    func deleteThenReaddSameIDResetsCompletionAndProgress() throws {
+        let defaults = makeIsolatedDefaults()
+        let progressDefaults = makeIsolatedDefaults()
+        let progressStore = ProgressStore(defaults: progressDefaults)
+        let pack = makeDTO(id: "topic_reset", title: "Reset Topic")
+        let disk = InMemoryDiskStore(seed: [], user: [pack])
+
+        let firstLaunch = makeRepository(disk: disk, defaults: defaults, progressStore: progressStore)
+        let topic = try #require(firstLaunch.topics.first)
+        let section = try #require(topic.sections.first)
+        let card = try #require(section.cards.first)
+
+        progressStore.markLearned(card)
+        progressStore.markSectionCompleted(section)
+        firstLaunch.toggleCompleted(topic)
+
+        try firstLaunch.deleteTopic(topic)
+
+        #expect(progressStore.progress(for: topic) == 0)
+        #expect(!firstLaunch.isCompleted(topic))
+
+        let readded = try #require(firstLaunch.appendOrReplaceUserPack(pack))
+        #expect(progressStore.progress(for: readded) == 0)
+        #expect(!firstLaunch.isCompleted(readded))
+
+        let secondLaunch = makeRepository(disk: disk, defaults: defaults, progressStore: ProgressStore(defaults: progressDefaults))
+        let relaunchedTopic = try #require(secondLaunch.topics.first)
+        #expect(!secondLaunch.isCompleted(relaunchedTopic))
+    }
+
+    private func makeRepository(
+        disk: InMemoryDiskStore,
+        defaults: UserDefaults,
+        progressStore: ProgressStore? = nil
+    ) -> ContentRepository {
         let statusStore = TopicStatusStore(defaults: defaults)
         let orderStore = TopicOrderStore(defaults: defaults)
-        return ContentRepository(diskStore: disk, statusStore: statusStore, orderStore: orderStore)
+        return ContentRepository(
+            diskStore: disk,
+            statusStore: statusStore,
+            orderStore: orderStore,
+            progressStore: progressStore ?? .shared
+        )
     }
 
     private func makeIsolatedDefaults() -> UserDefaults {
@@ -134,21 +198,28 @@ struct ContentRepositoryTests {
 private final class InMemoryDiskStore: ContentDiskStoring {
     private let seed: [TopicPackDTO]
     private(set) var user: [TopicPackDTO]
+    private let loadUserError: Error?
+    private(set) var saveCallCount = 0
 
-    init(seed: [TopicPackDTO], user: [TopicPackDTO]) {
+    init(seed: [TopicPackDTO], user: [TopicPackDTO], loadUserError: Error? = nil) {
         self.seed = seed
         self.user = user
+        self.loadUserError = loadUserError
     }
 
     func loadSeedPacks() -> [TopicPackDTO] {
         seed
     }
 
-    func loadUserPacks() -> [TopicPackDTO] {
+    func loadUserPacks() throws -> [TopicPackDTO] {
+        if let loadUserError {
+            throw loadUserError
+        }
         user
     }
 
     func saveUserPacks(_ packs: [TopicPackDTO]) throws {
+        saveCallCount += 1
         user = packs
     }
 }

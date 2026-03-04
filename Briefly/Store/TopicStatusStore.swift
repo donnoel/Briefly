@@ -22,6 +22,11 @@ final class TopicStatusStore: ObservableObject {
         save()
     }
 
+    func unmarkCompleted(_ id: String) {
+        guard completedIDs.remove(id) != nil else { return }
+        save()
+    }
+
     func toggleCompleted(_ id: String) {
         if completedIDs.contains(id) {
             completedIDs.remove(id)

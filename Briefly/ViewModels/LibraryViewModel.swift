@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class LibraryViewModel: ObservableObject {
     @Published private(set) var topics: [TopicPack] = []
     @Published var searchText: String = ""
@@ -15,11 +16,11 @@ final class LibraryViewModel: ObservableObject {
     init(
         contentRepository: ContentRepository,
         progressStore: ProgressStore,
-        statusStore: TopicStatusStore = TopicStatusStore.shared
+        statusStore: TopicStatusStore? = nil
     ) {
         self.contentRepository = contentRepository
         self.progressStore = progressStore
-        self.statusStore = statusStore
+        self.statusStore = statusStore ?? .shared
         self.topics = contentRepository.topics
 
         contentRepository.$topics
@@ -29,7 +30,7 @@ final class LibraryViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        statusStore.$completedIDs
+        self.statusStore.$completedIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
@@ -118,16 +119,16 @@ final class LibraryViewModel: ObservableObject {
             "philosophy sparks",
             "design thinking"
         ]
-        let categories = ["Science", "Thinking", "Life", "Tech", "Creativity"]
-
         // Pick a subject the user doesn't already have. If all are taken, synthesize a new one.
-        let unseenSubjects = subjects.filter { !existingTitles.contains($0.lowercased()) }
-        var subject = unseenSubjects.randomElement() ?? "surprise topic"
-        if existingTitles.contains(subject.lowercased()) {
-            subject = "surprise topic \(UUID().uuidString.prefix(6))"
-        }
+        let subject: String = {
+            let unseenSubjects = subjects.filter { !existingTitles.contains($0.lowercased()) }
+            let candidate = unseenSubjects.randomElement() ?? "surprise topic"
+            if existingTitles.contains(candidate.lowercased()) {
+                return "surprise topic \(UUID().uuidString.prefix(6))"
+            }
+            return candidate
+        }()
 
-        let category = categories.randomElement() ?? "General"
         let difficulty = Difficulty.allCases.randomElement() ?? .beginner
 
         let config = OpenAIClient.Configuration(

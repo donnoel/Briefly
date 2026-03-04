@@ -54,7 +54,7 @@ struct SettingsSheet: View {
                         }
                     }
                     .pickerStyle(.navigationLink)
-                    .onChange(of: selectedModel) { newValue in
+                    .onChange(of: selectedModel, initial: false) { _, newValue in
                         ModelPreferenceStore.shared.preferredModel = newValue
                         statusMessage = "Model set to \(newValue)."
                     }

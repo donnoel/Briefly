@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class DeckSessionViewModel: ObservableObject {
     let topic: TopicPack
     let section: TopicSection
@@ -22,13 +23,13 @@ final class DeckSessionViewModel: ObservableObject {
         topic: TopicPack,
         section: TopicSection,
         progressStore: ProgressStore,
-        statusStore: TopicStatusStore = TopicStatusStore.shared
+        statusStore: TopicStatusStore? = nil
     ) {
         self.topic = topic
         self.section = section
         self.cards = section.cards
         self.progressStore = progressStore
-        self.statusStore = statusStore
+        self.statusStore = statusStore ?? .shared
         updateTopicCompletionIfNeeded()
     }
 

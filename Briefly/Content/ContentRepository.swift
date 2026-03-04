@@ -6,21 +6,36 @@ import Combine
 final class ContentRepository: ObservableObject {
     static let shared = ContentRepository()
 
+    enum RepositoryError: LocalizedError {
+        case userContentUnavailable(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .userContentUnavailable(let error):
+                return "Your saved topics could not be loaded. Fix or remove the existing saved topics file before making changes. (\(error.localizedDescription))"
+            }
+        }
+    }
+
     @Published private(set) var topics: [TopicPack] = []
     private let diskStore: any ContentDiskStoring
     private var seedPackDTOs: [TopicPackDTO] = []
     private var userPackDTOs: [TopicPackDTO] = []
     private let statusStore: TopicStatusStore
     private let orderStore: TopicOrderStore
+    private let progressStore: ProgressStore
+    private var userPackLoadFailure: Error?
 
     init(
-        diskStore: any ContentDiskStoring = ContentDiskStore(),
-        statusStore: TopicStatusStore = TopicStatusStore.shared,
-        orderStore: TopicOrderStore = TopicOrderStore.shared
+        diskStore: (any ContentDiskStoring)? = nil,
+        statusStore: TopicStatusStore? = nil,
+        orderStore: TopicOrderStore? = nil,
+        progressStore: ProgressStore? = nil
     ) {
-        self.diskStore = diskStore
-        self.statusStore = statusStore
-        self.orderStore = orderStore
+        self.diskStore = diskStore ?? ContentDiskStore()
+        self.statusStore = statusStore ?? .shared
+        self.orderStore = orderStore ?? .shared
+        self.progressStore = progressStore ?? .shared
         loadContent()
     }
 
@@ -28,7 +43,13 @@ final class ContentRepository: ObservableObject {
 
     private func loadContent() {
         seedPackDTOs = diskStore.loadSeedPacks()
-        userPackDTOs = diskStore.loadUserPacks()
+        do {
+            userPackDTOs = try diskStore.loadUserPacks()
+            userPackLoadFailure = nil
+        } catch {
+            userPackDTOs = []
+            userPackLoadFailure = error
+        }
         let mergedDTOs = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
 
         var loadedTopics = mergedDTOs.compactMap { $0.toModel() }
@@ -41,6 +62,7 @@ final class ContentRepository: ObservableObject {
     @discardableResult
     func appendOrReplaceUserPack(_ pack: TopicPackDTO) throws -> TopicPack? {
         guard pack.isValid() else { return nil }
+        try ensureUserContentIsWritable()
         let wasDeleted = statusStore.isDeleted(pack.id)
         if wasDeleted {
             statusStore.unmarkDeleted(pack.id)
@@ -94,6 +116,7 @@ final class ContentRepository: ObservableObject {
         let originalUserPacks = userPackDTOs
         // Remove from user packs if present
         if let index = userPackDTOs.firstIndex(where: { $0.id == topic.id }) {
+            try ensureUserContentIsWritable()
             userPackDTOs.remove(at: index)
             do {
                 try diskStore.saveUserPacks(userPackDTOs)
@@ -104,6 +127,8 @@ final class ContentRepository: ObservableObject {
         }
         // Always mark deleted to hide seed topics as well.
         statusStore.markDeleted(topic.id)
+        statusStore.unmarkCompleted(topic.id)
+        progressStore.resetProgress(for: topic)
 
         let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
         var loadedTopics = combined.compactMap { $0.toModel() }
@@ -130,6 +155,12 @@ final class ContentRepository: ObservableObject {
         active.move(fromOffsets: source, toOffset: destination)
         topics = active + completed
         orderStore.saveOrder(for: active.map { $0.id })
+    }
+
+    private func ensureUserContentIsWritable() throws {
+        if let userPackLoadFailure {
+            throw RepositoryError.userContentUnavailable(userPackLoadFailure)
+        }
     }
 
     private func filteredForDeletion(_ dtos: [TopicPackDTO]) -> [TopicPackDTO] {

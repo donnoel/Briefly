@@ -11,13 +11,15 @@ final class ProgressStore: ObservableObject {
     @Published private(set) var learnedCardIDs: Set<String> = []
     @Published private(set) var completedSectionIDs: Set<String> = []
 
+    private let defaults: UserDefaults
     private let storageKey = "Briefly.learnedCardIDs"
     private let sectionKey = "Briefly.completedSectionIDs"
     private let saveDebounceInterval: TimeInterval = 0.5
     private var pendingSaveWorkItem: DispatchWorkItem?
     private var backgroundObserver: NSObjectProtocol?
 
-    private init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
         observeAppBackground()
     }
@@ -50,10 +52,18 @@ final class ProgressStore: ObservableObject {
         completedSectionIDs.contains(section.id)
     }
 
+    func resetProgress(for topic: TopicPack) {
+        let cardIDs = Set(topic.sections.flatMap(\.cards).map(\.id))
+        let sectionIDs = Set(topic.sections.map(\.id))
+
+        learnedCardIDs.subtract(cardIDs)
+        completedSectionIDs.subtract(sectionIDs)
+        flushPendingSaves()
+    }
+
     // MARK: - Persistence
 
     private func load() {
-        let defaults = UserDefaults.standard
         if let array = defaults.array(forKey: storageKey) as? [String] {
             learnedCardIDs = Set(array)
         }
@@ -63,7 +73,6 @@ final class ProgressStore: ObservableObject {
     }
 
     private func save() {
-        let defaults = UserDefaults.standard
         defaults.set(Array(learnedCardIDs), forKey: storageKey)
         defaults.set(Array(completedSectionIDs), forKey: sectionKey)
     }
@@ -80,12 +89,9 @@ final class ProgressStore: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + saveDebounceInterval, execute: workItem)
     }
 
-    deinit {
-        pendingSaveWorkItem?.cancel()
+    isolated deinit {
         backgroundObserver.map(NotificationCenter.default.removeObserver)
-        Task { @MainActor in
-            self.flushPendingSaves()
-        }
+        flushPendingSaves()
     }
 
     private func observeAppBackground() {
