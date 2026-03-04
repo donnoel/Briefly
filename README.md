@@ -58,6 +58,7 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
   - **Got it** marks the card learned and advances
   - **Review again** queues it for another pass
 - The section view includes a study header with section/card progress.
+- Card height adapts to content density, with a compact stats row for current/remaining/progress.
 - When a section finishes, you can restart or continue to the next section.
 
 ### AI Generation

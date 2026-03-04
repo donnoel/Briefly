@@ -7,6 +7,22 @@ struct CardView: View {
     let isShowingBack: Bool
     let revealAction: () -> Void
 
+    private var displayText: String {
+        isShowingBack ? card.back : card.front
+    }
+
+    private var adaptiveCardHeight: CGFloat {
+        let count = displayText.count
+        switch count {
+        case 0...80:
+            return 240
+        case 81...180:
+            return 300
+        default:
+            return 360
+        }
+    }
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -35,7 +51,7 @@ struct CardView: View {
                         .font(.title2.weight(.semibold))
                         .foregroundColor(BrieflyTheme.Colors.textPrimary)
                         .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .opacity(isShowingBack ? 0 : 1)
@@ -52,7 +68,7 @@ struct CardView: View {
                         .font(.title2.weight(.semibold))
                         .foregroundColor(BrieflyTheme.Colors.textPrimary)
                         .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .opacity(isShowingBack ? 1 : 0)
@@ -92,7 +108,8 @@ struct CardView: View {
             x: 0,
             y: 10
         )
-        .frame(maxWidth: .infinity, minHeight: 360, maxHeight: 480)
+        .frame(maxWidth: .infinity)
+        .frame(height: adaptiveCardHeight)
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .onTapGesture {
             if !isShowingBack {
