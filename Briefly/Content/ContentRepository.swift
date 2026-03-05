@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import Combine
+import CloudKit
 
 @MainActor
 final class ContentRepository: ObservableObject {
@@ -24,19 +25,30 @@ final class ContentRepository: ObservableObject {
     private let statusStore: TopicStatusStore
     private let orderStore: TopicOrderStore
     private let progressStore: ProgressStore
+    private let cloudSyncService: (any CloudTopicSyncing)?
     private var userPackLoadFailure: Error?
+    private var cloudSyncTask: Task<Void, Never>?
+    private var cloudDebouncedSyncTask: Task<Void, Never>?
+
+    private enum SyncTrigger {
+        case localMutation
+        case remoteNotification
+    }
 
     init(
         diskStore: (any ContentDiskStoring)? = nil,
         statusStore: TopicStatusStore? = nil,
         orderStore: TopicOrderStore? = nil,
-        progressStore: ProgressStore? = nil
+        progressStore: ProgressStore? = nil,
+        cloudSyncService: (any CloudTopicSyncing)? = nil
     ) {
         self.diskStore = diskStore ?? ContentDiskStore()
         self.statusStore = statusStore ?? .shared
         self.orderStore = orderStore ?? .shared
         self.progressStore = progressStore ?? .shared
+        self.cloudSyncService = cloudSyncService ?? CloudTopicSyncService.shared
         loadContent()
+        refreshFromCloud()
     }
 
     // MARK: - Loading
@@ -50,11 +62,7 @@ final class ContentRepository: ObservableObject {
             userPackDTOs = []
             userPackLoadFailure = error
         }
-        let mergedDTOs = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
-
-        var loadedTopics = mergedDTOs.compactMap { $0.toModel() }
-        applyOrdering(to: &loadedTopics)
-        topics = loadedTopics.isEmpty ? Self.sampleTopics : loadedTopics
+        rebuildTopicsFromCurrentDTOs()
     }
 
     // MARK: - Mutation
@@ -88,7 +96,6 @@ final class ContentRepository: ObservableObject {
             }
             throw error
         }
-
         let combined = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
         var loadedTopics = combined.compactMap { $0.toModel() }
 
@@ -108,6 +115,8 @@ final class ContentRepository: ObservableObject {
                 topics = loadedTopics
             }
         }
+
+        scheduleCloudSync()
 
         return pack.toModel()
     }
@@ -138,6 +147,7 @@ final class ContentRepository: ObservableObject {
             .filter { !statusStore.isCompleted($0.id) }
             .map(\.id)
         orderStore.saveOrder(for: activeIDs)
+        scheduleCloudSync()
     }
 
     func toggleCompleted(_ topic: TopicPack) {
@@ -155,12 +165,161 @@ final class ContentRepository: ObservableObject {
         active.move(fromOffsets: source, toOffset: destination)
         topics = active + completed
         orderStore.saveOrder(for: active.map { $0.id })
+        scheduleCloudSync()
+    }
+
+    func refreshFromCloud() {
+        guard let cloudSyncService else { return }
+        cloudSyncTask?.cancel()
+        cloudSyncTask = Task { @MainActor in
+            await performCloudSync(using: cloudSyncService, trigger: .remoteNotification)
+        }
     }
 
     private func ensureUserContentIsWritable() throws {
         if let userPackLoadFailure {
             throw RepositoryError.userContentUnavailable(userPackLoadFailure)
         }
+    }
+
+    private func rebuildTopicsFromCurrentDTOs() {
+        let mergedDTOs = deduplicatedDTOs(seed: seedPackDTOs, user: userPackDTOs)
+        var loadedTopics = mergedDTOs.compactMap { $0.toModel() }
+        applyOrdering(to: &loadedTopics)
+        topics = loadedTopics.isEmpty ? Self.sampleTopics : loadedTopics
+    }
+
+    private func scheduleCloudSync() {
+        guard let cloudSyncService else { return }
+        cloudDebouncedSyncTask?.cancel()
+        cloudDebouncedSyncTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 350_000_000)
+            } catch {
+                return
+            }
+            await performCloudSync(using: cloudSyncService, trigger: .localMutation)
+        }
+    }
+
+    private func performCloudSync(using cloudSyncService: any CloudTopicSyncing, trigger: SyncTrigger) async {
+        for _ in 0..<3 {
+            do {
+                let localState = currentLocalSyncState()
+                let remoteState = try await cloudSyncService.fetchState()
+
+                let mergedState = mergeCloudAndLocalState(
+                    remoteState: remoteState,
+                    localState: localState,
+                    trigger: trigger
+                )
+                if mergedState.userPacks != localState.userPacks || mergedState.orderedTopicIDs != localState.orderedTopicIDs {
+                    do {
+                        try diskStore.saveUserPacks(mergedState.userPacks)
+                        userPackDTOs = mergedState.userPacks
+                        userPackLoadFailure = nil
+                        orderStore.saveOrder(for: mergedState.orderedTopicIDs)
+                        rebuildTopicsFromCurrentDTOs()
+                    } catch {
+                        return
+                    }
+                }
+
+                if remoteState == nil || remoteState != mergedState {
+                    try await cloudSyncService.saveState(mergedState)
+                }
+                return
+            } catch let error as CKError where error.code == .serverRecordChanged {
+                continue
+            } catch {
+                // Best-effort sync. Local content remains the source of truth when cloud is unavailable.
+                return
+            }
+        }
+    }
+
+    private func currentLocalSyncState() -> CloudTopicState {
+        CloudTopicState(
+            userPacks: userPackDTOs,
+            orderedTopicIDs: normalizeOrder(
+                orderStore.loadOrder(),
+                validIDs: Set(userPackDTOs.map { $0.id.lowercased() }),
+                canonicalIDByLowercasedID: Dictionary(
+                    uniqueKeysWithValues: userPackDTOs.map { ($0.id.lowercased(), $0.id) }
+                )
+            )
+        )
+    }
+
+    private func mergeCloudAndLocalState(
+        remoteState: CloudTopicState?,
+        localState: CloudTopicState,
+        trigger: SyncTrigger
+    ) -> CloudTopicState {
+        guard let remoteState else {
+            let mergedPacks = deduplicatedDTOs(seed: [], user: localState.userPacks)
+            return CloudTopicState(
+                userPacks: mergedPacks,
+                orderedTopicIDs: mergedOrder(
+                    preferredOrder: localState.orderedTopicIDs,
+                    secondaryOrder: [],
+                    packs: mergedPacks
+                )
+            )
+        }
+
+        let mergedPacks = deduplicatedDTOs(seed: remoteState.userPacks, user: localState.userPacks)
+        let preferredOrder: [String]
+        let secondaryOrder: [String]
+        switch trigger {
+        case .localMutation:
+            preferredOrder = localState.orderedTopicIDs
+            secondaryOrder = remoteState.orderedTopicIDs
+        case .remoteNotification:
+            preferredOrder = remoteState.orderedTopicIDs
+            secondaryOrder = localState.orderedTopicIDs
+        }
+
+        return CloudTopicState(
+            userPacks: mergedPacks,
+            orderedTopicIDs: mergedOrder(preferredOrder: preferredOrder, secondaryOrder: secondaryOrder, packs: mergedPacks)
+        )
+    }
+
+    private func mergedOrder(preferredOrder: [String], secondaryOrder: [String], packs: [TopicPackDTO]) -> [String] {
+        let canonicalIDByLowercasedID = Dictionary(uniqueKeysWithValues: packs.map { ($0.id.lowercased(), $0.id) })
+        let validIDs = Set(canonicalIDByLowercasedID.keys)
+        let normalizedPreferred = normalizeOrder(preferredOrder, validIDs: validIDs, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
+        let normalizedSecondary = normalizeOrder(secondaryOrder, validIDs: validIDs, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
+        let fallback = normalizeOrder(packs.map(\.id), validIDs: validIDs, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
+
+        var merged: [String] = []
+        var seen = Set<String>()
+        for id in normalizedPreferred + normalizedSecondary + fallback {
+            let key = id.lowercased()
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            merged.append(id)
+        }
+        return merged
+    }
+
+    private func normalizeOrder(
+        _ order: [String],
+        validIDs: Set<String>,
+        canonicalIDByLowercasedID: [String: String]
+    ) -> [String] {
+        var normalized: [String] = []
+        var seen = Set<String>()
+        for id in order {
+            let key = id.lowercased()
+            guard validIDs.contains(key), !seen.contains(key), let canonicalID = canonicalIDByLowercasedID[key] else {
+                continue
+            }
+            seen.insert(key)
+            normalized.append(canonicalID)
+        }
+        return normalized
     }
 
     private func filteredForDeletion(_ dtos: [TopicPackDTO]) -> [TopicPackDTO] {

@@ -20,6 +20,33 @@ struct AIGenerationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if isGenerating {
+                    Section("Progress") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ProgressView(value: progressFraction)
+                                .tint(BrieflyTheme.Colors.accent)
+                            HStack {
+                                Text(progressText ?? "Generating…")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                                Spacer()
+                                Text("\(Int((progressFraction * 100).rounded()))%")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.secondary)
+                            }
+                            Text("Keep this sheet open while we build your topic.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Button(role: .destructive) {
+                                cancelGeneration()
+                            } label: {
+                                Text("Cancel Generation")
+                            }
+                            .padding(.top, 2)
+                        }
+                    }
+                }
+
                 Section {
                     Button {
                         generate()
@@ -50,20 +77,24 @@ struct AIGenerationSheet: View {
 
                 Section("Topic") {
                     TextField("Title or concept", text: $title)
+                        .disabled(isGenerating)
                     Picker("Difficulty", selection: $difficulty) {
                         ForEach(Difficulty.allCases, id: \.self) { level in
                             Text(level.rawValue).tag(level)
                         }
                     }
+                    .disabled(isGenerating)
                 }
 
                 Section("Size") {
                     Stepper(value: $targetSections, in: 1...50) {
                         Text("Sections: \(targetSections)")
                     }
+                    .disabled(isGenerating)
                     Stepper(value: $targetCardsPerSection, in: 1...50) {
                         Text("Cards per section: \(targetCardsPerSection)")
                     }
+                    .disabled(isGenerating)
                 }
             }
             .navigationTitle("Fresh Topics")

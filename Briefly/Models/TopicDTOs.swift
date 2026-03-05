@@ -1,7 +1,7 @@
 import Foundation
 
 // Codable representations for loading/saving topic packs.
-struct CardDTO: Codable, Hashable {
+struct CardDTO: Codable, Hashable, Sendable {
     let id: String
     let front: String
     let back: String
@@ -17,7 +17,7 @@ struct CardDTO: Codable, Hashable {
     }
 }
 
-struct TopicSectionDTO: Codable, Hashable {
+struct TopicSectionDTO: Codable, Hashable, Sendable {
     let id: String
     let title: String
     let cards: [CardDTO]
@@ -31,7 +31,7 @@ struct TopicSectionDTO: Codable, Hashable {
     }
 }
 
-struct TopicPackDTO: Codable, Hashable {
+struct TopicPackDTO: Codable, Hashable, Sendable {
     let id: String
     let title: String
     let subtitle: String

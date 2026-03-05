@@ -34,6 +34,7 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 | 🔁 **Review Loop** | Mark **Got it** to advance, or **Review again** to repeat. |
 | 🪄 **AI Topic Generation** | Generate multi-section packs (with card sources/tags) using OpenAI. |
 | 🧾 **Review Before Save** | Generated packs open in a review screen so you can refine before saving. |
+| ☁️ **iCloud Topic Sync** | User-created topics and topic order sync through your private iCloud database across devices on the same Apple ID, including CloudKit push refresh. |
 | 🔎 **Search + Filters** | Search topics and filter by category/difficulty. |
 | 🗃️ **Local Persistence** | User-created content persists to disk; API keys stored securely. |
 
@@ -67,7 +68,7 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
   - topic title/concept
   - difficulty
   - number of sections + cards per section
-- Briefly generates in batches, then opens a **review screen**.
+- Briefly generates in batches with visible progress, then opens a **review screen**.
 
 ---
 
@@ -166,6 +167,7 @@ Briefly/
 
 - If you don’t include `seed_content.json` in the app bundle, the library may start empty until you generate or import content.
 - Generated packs are saved locally as JSON in your Documents directory.
+- Generated/user topics are synced to iCloud (private CloudKit database) when available.
 - Topic completion/deletion state is tracked separately so you can hide seed topics too.
 
 ---
