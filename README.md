@@ -44,6 +44,8 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 
 ### Library
 - Your topics appear in **Active** and **Completed** sections.
+- Active search/filter chips appear at the top of the list and can be cleared individually.
+- If filters/search remove all visible topics, Briefly shows a **No matching topics** state with a **Clear filters** action.
 - Reorder active topics with drag-and-drop.
 - Swipe:
   - **Leading**: mark complete/incomplete

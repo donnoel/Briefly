@@ -12,6 +12,36 @@ struct LibraryView: View {
 
     var body: some View {
         List {
+            if hasActiveFilters {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        if !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            chip(title: "Search: \(viewModel.searchText)") {
+                                viewModel.searchText = ""
+                            }
+                        }
+                        if let category = viewModel.selectedCategory {
+                            chip(title: "Category: \(category)") {
+                                viewModel.selectedCategory = nil
+                            }
+                        }
+                        if let difficulty = viewModel.selectedDifficulty {
+                            chip(title: "Difficulty: \(difficulty.rawValue)") {
+                                viewModel.selectedDifficulty = nil
+                            }
+                        }
+                        Button("Clear all") {
+                            clearFilters()
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                    .padding(.vertical, 4)
+                }
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
+
             if !viewModel.activeTopics.isEmpty {
                 Section("Active") {
                     ForEach(viewModel.activeTopics) { topic in
@@ -56,51 +86,46 @@ struct LibraryView: View {
                 }
                 .accessibilityLabel("Settings")
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 12) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Menu {
                     Button {
                         Task { await generateRandomTopic() }
                     } label: {
-                        Image(systemName: "sparkles.tv")
-                            .symbolEffect(.pulse.byLayer, isActive: isGeneratingRandom)
+                        Label("Surprise me", systemImage: "sparkles.tv")
                     }
                     .disabled(isGeneratingRandom)
-                    .accessibilityLabel("Surprise me")
 
-                    Menu {
-                        if !viewModel.availableCategories.isEmpty {
-                            Picker("Category", selection: $viewModel.selectedCategory) {
-                                Text("All categories").tag(String?.none)
-                                ForEach(viewModel.availableCategories, id: \.self) { category in
-                                    Text(category).tag(String?.some(category))
-                                }
+                    if !viewModel.availableCategories.isEmpty {
+                        Picker("Category", selection: $viewModel.selectedCategory) {
+                            Text("All categories").tag(String?.none)
+                            ForEach(viewModel.availableCategories, id: \.self) { category in
+                                Text(category).tag(String?.some(category))
                             }
                         }
-
-                        Picker("Difficulty", selection: $viewModel.selectedDifficulty) {
-                            Text("All difficulties").tag(Difficulty?.none)
-                            ForEach(Difficulty.allCases, id: \.self) { level in
-                                Text(level.rawValue).tag(Difficulty?.some(level))
-                            }
-                        }
-
-                        Button("Clear filters") {
-                            viewModel.selectedCategory = nil
-                            viewModel.selectedDifficulty = nil
-                            viewModel.searchText = ""
-                        }
-                    } label: {
-                        Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                     }
-                    .accessibilityLabel("Filters")
 
-                    Button {
-                        showingAIGenerator = true
-                    } label: {
-                        Image(systemName: "sparkles")
+                    Picker("Difficulty", selection: $viewModel.selectedDifficulty) {
+                        Text("All difficulties").tag(Difficulty?.none)
+                        ForEach(Difficulty.allCases, id: \.self) { level in
+                            Text(level.rawValue).tag(Difficulty?.some(level))
+                        }
                     }
-                    .accessibilityLabel("Generate with AI")
+
+                    Button("Clear filters") {
+                        clearFilters()
+                    }
+                    .disabled(!hasActiveFilters)
+                } label: {
+                    Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                 }
+                .accessibilityLabel("Filters")
+
+                Button {
+                    showingAIGenerator = true
+                } label: {
+                    Label("Generate", systemImage: "sparkles")
+                }
+                .accessibilityLabel("Generate with AI")
             }
         }
         .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search topics")
@@ -142,8 +167,10 @@ struct LibraryView: View {
             }
         }
         .overlay {
-            if !hasTopics {
+            if !hasAnyTopics {
                 emptyState
+            } else if hasActiveFilters && !hasVisibleTopics {
+                noResultsState
             }
         }
     }
@@ -218,8 +245,24 @@ struct LibraryView: View {
         }
     }
 
-    private var hasTopics: Bool {
+    private var hasVisibleTopics: Bool {
         !viewModel.activeTopics.isEmpty || !viewModel.completedTopics.isEmpty
+    }
+
+    private var hasAnyTopics: Bool {
+        !viewModel.topics.isEmpty
+    }
+
+    private var hasActiveFilters: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || viewModel.selectedCategory != nil
+            || viewModel.selectedDifficulty != nil
+    }
+
+    private func clearFilters() {
+        viewModel.selectedCategory = nil
+        viewModel.selectedDifficulty = nil
+        viewModel.searchText = ""
     }
 
     private var emptyState: some View {
@@ -247,16 +290,43 @@ struct LibraryView: View {
         .offset(y: -60)
     }
 
+    private var noResultsState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 40))
+                .foregroundColor(BrieflyTheme.Colors.accent)
+            Text("No matching topics")
+                .font(.headline)
+            Text("Try removing one or more filters, or clear search.")
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 32)
+            Button("Clear filters") {
+                clearFilters()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .offset(y: -60)
+    }
+
     private func chip(title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule().fill(BrieflyTheme.Colors.accentSoft(colorScheme))
-                )
-                .foregroundColor(BrieflyTheme.Colors.accent)
+            HStack(spacing: 4) {
+                Text(title)
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption2)
+            }
+            .lineLimit(1)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(BrieflyTheme.Colors.accentSoft(colorScheme))
+            )
+            .foregroundColor(BrieflyTheme.Colors.accent)
         }
         .buttonStyle(.plain)
     }
