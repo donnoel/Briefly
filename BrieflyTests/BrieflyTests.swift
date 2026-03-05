@@ -88,15 +88,15 @@ struct ContentRepositoryTests {
 
         do {
             _ = try repo.appendOrReplaceUserPack(makeDTO(id: "new_topic", title: "New Topic"))
-            #expect(false)
+            #expect(Bool(false))
             return
         } catch let error as ContentRepository.RepositoryError {
             guard case .userContentUnavailable = error else {
-                #expect(false)
+                #expect(Bool(false))
                 return
             }
         } catch {
-            #expect(false)
+            #expect(Bool(false))
             return
         }
 
@@ -126,7 +126,8 @@ struct ContentRepositoryTests {
         #expect(progressStore.progress(for: topic) == 0)
         #expect(!firstLaunch.isCompleted(topic))
 
-        let readded = try #require(firstLaunch.appendOrReplaceUserPack(pack))
+        let readdedCandidate = try firstLaunch.appendOrReplaceUserPack(pack)
+        let readded = try #require(readdedCandidate)
         #expect(progressStore.progress(for: readded) == 0)
         #expect(!firstLaunch.isCompleted(readded))
 
@@ -215,7 +216,7 @@ private final class InMemoryDiskStore: ContentDiskStoring {
         if let loadUserError {
             throw loadUserError
         }
-        user
+        return user
     }
 
     func saveUserPacks(_ packs: [TopicPackDTO]) throws {
