@@ -62,17 +62,9 @@ struct AIGenerationSheet: View {
                                     .font(.headline)
                             }
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.accentColor)
-                        )
-                        .foregroundColor(.white)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(BrieflyPrimaryButtonStyle())
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating)
-                    .opacity((title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isGenerating) ? 0.6 : 1)
                 }
 
                 Section("Topic") {

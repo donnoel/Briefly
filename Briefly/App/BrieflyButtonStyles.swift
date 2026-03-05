@@ -18,6 +18,23 @@ struct BrieflyPrimaryButtonStyle: ButtonStyle {
     }
 }
 
+struct BrieflyCompactPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.callout.weight(.semibold))
+            .foregroundColor(.white)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(BrieflyTheme.Colors.accent)
+                    .opacity(configuration.isPressed ? 0.85 : 1.0)
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 struct BrieflySecondaryButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) private var colorScheme
 

@@ -7,21 +7,7 @@ struct CardView: View {
     let isShowingBack: Bool
     let revealAction: () -> Void
 
-    private var displayText: String {
-        isShowingBack ? card.back : card.front
-    }
-
-    private var adaptiveCardHeight: CGFloat {
-        let count = displayText.count
-        switch count {
-        case 0...80:
-            return 240
-        case 81...180:
-            return 300
-        default:
-            return 360
-        }
-    }
+    private let cardHeight: CGFloat = 320
 
     var body: some View {
         ZStack {
@@ -55,6 +41,7 @@ struct CardView: View {
                 }
             }
             .opacity(isShowingBack ? 0 : 1)
+            .accessibilityHidden(isShowingBack)
             .padding(.horizontal, 24)
             .padding(.vertical, 28)
 
@@ -73,6 +60,7 @@ struct CardView: View {
             }
             .opacity(isShowingBack ? 1 : 0)
             .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+            .accessibilityHidden(!isShowingBack)
             .padding(.horizontal, 24)
             .padding(.vertical, 28)
 
@@ -109,7 +97,7 @@ struct CardView: View {
             y: 10
         )
         .frame(maxWidth: .infinity)
-        .frame(height: adaptiveCardHeight)
+        .frame(height: cardHeight)
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .onTapGesture {
             if !isShowingBack {

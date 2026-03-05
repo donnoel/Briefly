@@ -29,10 +29,8 @@ struct SettingsSheet: View {
                             showingKeyEntry = true
                         } label: {
                             Text("Manage")
-                                .font(.callout.weight(.semibold))
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.accentColor)
+                        .buttonStyle(BrieflyCompactPrimaryButtonStyle())
                     }
                     if let statusMessage {
                         Text(statusMessage)
