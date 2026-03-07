@@ -60,22 +60,11 @@ struct LibraryView: View {
             }
         }
         .listStyle(.plain)
-        .listSectionSpacing(22)
+        .listSectionSpacing(20)
         .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
-        .background(
-            LinearGradient(
-                colors: [
-                    BrieflyTheme.Colors.background(colorScheme),
-                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.22),
-                    BrieflyTheme.Colors.background(colorScheme)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
+        .background(libraryBackground)
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -222,7 +211,7 @@ struct LibraryView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Resume your momentum")
-                        .font(.title2.weight(.bold))
+                        .font(.system(.title2, design: .rounded).weight(.bold))
                         .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
                     Text(hasAnyTopics
@@ -237,12 +226,30 @@ struct LibraryView: View {
 
                 if hasAnyTopics {
                     Image(systemName: "sparkles.rectangle.stack.fill")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(BrieflyTheme.Colors.accent)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    BrieflyTheme.Colors.accent,
+                                    BrieflyTheme.Colors.accentSecondary
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(BrieflyTheme.Colors.elevatedBackground(colorScheme))
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(colorScheme == .dark ? 0.10 : 0.92),
+                                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.30 : 0.34)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                         )
                 }
             }
@@ -260,12 +267,19 @@ struct LibraryView: View {
                     LinearGradient(
                         colors: [
                             BrieflyTheme.Colors.cardBackground(colorScheme),
-                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.72)
+                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.46 : 0.80)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
+                .overlay(alignment: .topTrailing) {
+                    Circle()
+                        .fill(BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme))
+                        .frame(width: 140, height: 140)
+                        .blur(radius: 18)
+                        .offset(x: 26, y: -30)
+                }
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
@@ -361,8 +375,17 @@ struct LibraryView: View {
             ForEach(viewModel.exploreTopicGroups) { group in
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text(group.title)
+                        let style = BrieflyTheme.Colors.topicStyle(for: group.title)
+
+                        Label(group.title, systemImage: style.symbolName)
                             .font(.headline.weight(.semibold))
+                            .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(style.ambient(for: colorScheme).opacity(colorScheme == .dark ? 0.24 : 0.14))
+                            )
 
                         Spacer()
 
@@ -391,7 +414,7 @@ struct LibraryView: View {
     private func sectionHeader(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.title3.weight(.bold))
+                .font(.system(.title3, design: .rounded).weight(.bold))
                 .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
             Text(subtitle)
@@ -404,7 +427,7 @@ struct LibraryView: View {
     private func listSectionHeader(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.headline.weight(.semibold))
+                .font(.system(.headline, design: .rounded).weight(.semibold))
                 .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
             Text(subtitle)
@@ -429,7 +452,16 @@ struct LibraryView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(BrieflyTheme.Colors.elevatedBackground(colorScheme))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            BrieflyTheme.Colors.elevatedBackground(colorScheme),
+                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.24)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
     }
 
@@ -567,5 +599,55 @@ struct LibraryView: View {
             .foregroundColor(BrieflyTheme.Colors.accent)
         }
         .buttonStyle(.plain)
+    }
+
+    private var libraryBackground: some View {
+        ZStack {
+            BrieflyTheme.Colors.background(colorScheme)
+
+            RadialGradient(
+                colors: [
+                    BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme),
+                    .clear
+                ],
+                center: .topLeading,
+                startRadius: 30,
+                endRadius: 380
+            )
+            .offset(x: -40, y: -70)
+
+            RadialGradient(
+                colors: [
+                    BrieflyTheme.Colors.libraryAmbientSecondary(colorScheme),
+                    .clear
+                ],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 320
+            )
+            .offset(x: 40, y: 140)
+
+            RadialGradient(
+                colors: [
+                    BrieflyTheme.Colors.libraryAmbientTertiary(colorScheme),
+                    .clear
+                ],
+                center: .bottomLeading,
+                startRadius: 20,
+                endRadius: 260
+            )
+            .offset(x: -80, y: 220)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(colorScheme == .dark ? 0.02 : 0.10),
+                    .clear,
+                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.04 : 0.07)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea()
     }
 }
