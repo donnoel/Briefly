@@ -48,6 +48,7 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
   - a **Continue Learning** carousel driven by in-progress and recently opened topics
   - a **Featured** topic card
   - category-based **Explore Topics** rows
+- As you scroll deeper into the library, the oversized top area condenses into a compact contextual header so search/navigation feel anchored.
 - Your topics still remain available in **Your Order** and **Completed** sections.
 - Active search/filter chips appear near the top and can be cleared individually.
 - If filters/search remove all visible topics, Briefly shows a **No matching topics** state with a **Clear filters** action.
@@ -57,7 +58,9 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
   - **Trailing**: delete
 
 ### Topic Detail
-- See a summary card plus a list of sections.
+- See an immersive topic hero with category, difficulty, section/card counts, and progress.
+- The topic hero collapses into a compact pinned header as you scroll.
+- Sections are presented as elevated entry cards that keep review actions easy to scan.
 - Tap a section to start a deck session.
 
 ### Deck Session

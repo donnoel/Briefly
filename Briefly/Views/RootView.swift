@@ -3,6 +3,7 @@ import Combine
 
 struct RootView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
+    @Namespace private var topicTransition
     @StateObject private var libraryViewModel = LibraryViewModel(
         contentRepository: ContentRepository.shared,
         progressStore: ProgressStore.shared
@@ -10,7 +11,7 @@ struct RootView: View {
 
     var body: some View {
         NavigationStack(path: $coordinator.path) {
-            LibraryView(viewModel: libraryViewModel)
+            LibraryView(viewModel: libraryViewModel, topicTransition: topicTransition)
             .navigationDestination(for: AppCoordinator.Route.self) { route in
                 switch route {
                 case .topic(let topic):
@@ -18,7 +19,8 @@ struct RootView: View {
                         viewModel: TopicDetailViewModel(
                             topic: topic,
                             progressStore: ProgressStore.shared
-                        )
+                        ),
+                        topicTransition: topicTransition
                     )
                 case .deck(let topic, let section):
                     DeckView(

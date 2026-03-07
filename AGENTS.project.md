@@ -9,7 +9,7 @@ Success means users can reliably add content, complete deck sessions, and resume
 
 ## Current product phase (MVP+ implemented)
 1) Current scope
-- Topic library with featured, continue-learning, category browse, and active/completed grouping
+- Topic library with featured, continue-learning, category browse, active/completed grouping, and contextual sticky headers during scroll
 - Section-based deck sessions with reveal-and-rate flow
 - Local persistence for user topic packs (`user_content.json`)
 - Topic completion/deletion/order persistence in `UserDefaults`
@@ -65,6 +65,7 @@ Success means users can reliably add content, complete deck sessions, and resume
 
 ## UX rules
 - Keep flows simple and readable for short study sessions.
+- Topic detail should preserve context with a premium hero summary and clear section-entry affordances, without changing deck behavior.
 - Preserve the library's resume surfaces: continue-learning cards should be powered by existing progress plus lightweight recency state, not new recommendation logic.
 - Keep error text plain-language and actionable.
 - Do not add setup friction to core library/deck usage.

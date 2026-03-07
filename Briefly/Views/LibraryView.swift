@@ -4,11 +4,13 @@ struct LibraryView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: LibraryViewModel
+    let topicTransition: Namespace.ID
     @State private var showingAIGenerator = false
     @State private var showingSettings = false
     @State private var isGeneratingRandom = false
     @State private var randomError: String?
     @State private var libraryError: String?
+    @State private var overviewMinY: CGFloat = 0
 
     var body: some View {
         List {
@@ -61,13 +63,16 @@ struct LibraryView: View {
         }
         .listStyle(.plain)
         .listSectionSpacing(18)
+        .coordinateSpace(name: "libraryScroll")
         .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
         .background(libraryBackground)
+        .onPreferenceChange(LibraryOverviewOffsetKey.self) { overviewMinY = $0 }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(libraryCompactHeaderVisible ? .visible : .hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -76,6 +81,9 @@ struct LibraryView: View {
                     Image(systemName: "gearshape")
                 }
                 .accessibilityLabel("Settings")
+            }
+            ToolbarItem(placement: .principal) {
+                compactLibraryHeader
             }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Menu {
@@ -173,7 +181,6 @@ struct LibraryView: View {
     @ViewBuilder
     private func topicRow(_ topic: TopicPack) -> some View {
         libraryTopicButton(topic, variant: .standard)
-        .buttonStyle(LibraryCardButtonStyle())
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
         .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
@@ -262,6 +269,15 @@ struct LibraryView: View {
         }
         .padding(20)
         .background(
+            GeometryReader { geometry in
+                Color.clear
+                    .preference(
+                        key: LibraryOverviewOffsetKey.self,
+                        value: geometry.frame(in: .named("libraryScroll")).minY
+                    )
+            }
+        )
+        .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(
                     LinearGradient(
@@ -335,7 +351,7 @@ struct LibraryView: View {
             )
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                LazyHStack(spacing: 16) {
                     ForEach(viewModel.continueLearningTopics) { topic in
                         libraryTopicButton(topic, variant: .continueLearning)
                             .frame(width: 320)
@@ -399,7 +415,7 @@ struct LibraryView: View {
                     }
 
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 14) {
+                        LazyHStack(spacing: 14) {
                             ForEach(group.topics) { topic in
                                 libraryTopicButton(topic, variant: .standard)
                                     .frame(width: 280)
@@ -479,6 +495,7 @@ struct LibraryView: View {
                 progress: viewModel.progress(for: topic),
                 variant: variant
             )
+            .matchedTransitionSource(id: topic.id, in: topicTransition)
             .overlay(alignment: .topTrailing) {
                 if viewModel.isCompleted(topic) {
                     Image(systemName: "checkmark.seal.fill")
@@ -488,7 +505,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .buttonStyle(LibraryCardButtonStyle())
+        .buttonStyle(InteractiveCardButtonStyle())
     }
 
     private func generateRandomTopic() async {
@@ -664,19 +681,44 @@ struct LibraryView: View {
         }
         .ignoresSafeArea()
     }
+
+    private var libraryCompactHeaderVisible: Bool {
+        overviewMinY < -72
+    }
+
+    private var compactLibraryHeader: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles.rectangle.stack.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(BrieflyTheme.Colors.accent)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Library")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(BrieflyTheme.Colors.textPrimary)
+
+                Text(hasAnyTopics ? "\(viewModel.activeTopics.count) active topics" : "Browse your topics")
+                    .font(.caption2)
+                    .foregroundColor(BrieflyTheme.Colors.textSecondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+        )
+        .opacity(libraryCompactHeaderVisible ? 1 : 0)
+        .scaleEffect(libraryCompactHeaderVisible ? 1 : 0.96)
+        .animation(.easeInOut(duration: 0.2), value: libraryCompactHeaderVisible)
+        .accessibilityHidden(!libraryCompactHeaderVisible)
+    }
 }
 
-private struct LibraryCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .brightness(configuration.isPressed ? -0.02 : 0)
-            .shadow(
-                color: Color.black.opacity(configuration.isPressed ? 0.12 : 0),
-                radius: configuration.isPressed ? 18 : 0,
-                x: 0,
-                y: configuration.isPressed ? 10 : 0
-            )
-            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: configuration.isPressed)
+private struct LibraryOverviewOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
