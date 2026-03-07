@@ -12,56 +12,55 @@ struct LibraryView: View {
 
     var body: some View {
         List {
+            overviewSection
+
             if hasActiveFilters {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        if !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            chip(title: "Search: \(viewModel.searchText)") {
-                                viewModel.searchText = ""
-                            }
-                        }
-                        if let category = viewModel.selectedCategory {
-                            chip(title: "Category: \(category)") {
-                                viewModel.selectedCategory = nil
-                            }
-                        }
-                        if let difficulty = viewModel.selectedDifficulty {
-                            chip(title: "Difficulty: \(difficulty.rawValue)") {
-                                viewModel.selectedDifficulty = nil
-                            }
-                        }
-                        Button("Clear all") {
-                            clearFilters()
-                        }
-                        .font(.caption.weight(.semibold))
-                    }
-                    .padding(.vertical, 4)
-                }
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                .listRowBackground(Color.clear)
+                activeFiltersRow
+            }
+
+            if !viewModel.continueLearningTopics.isEmpty {
+                continueLearningSection
+            }
+
+            if let featuredTopic = viewModel.featuredTopic {
+                featuredSection(topic: featuredTopic)
+            }
+
+            if !viewModel.exploreTopicGroups.isEmpty {
+                exploreSection
             }
 
             if !viewModel.activeTopics.isEmpty {
-                Section("Active") {
+                Section {
                     ForEach(viewModel.activeTopics) { topic in
                         topicRow(topic)
                     }
                     .onMove { indices, newOffset in
                         viewModel.moveActiveTopics(from: indices, to: newOffset)
                     }
+                } header: {
+                    listSectionHeader(
+                        title: "Your Order",
+                        subtitle: "All active topics remain available here, and you can still reorder them."
+                    )
                 }
             }
 
             if !viewModel.completedTopics.isEmpty {
-                Section("Completed") {
+                Section {
                     ForEach(viewModel.completedTopics) { topic in
                         topicRow(topic)
                     }
+                } header: {
+                    listSectionHeader(
+                        title: "Completed",
+                        subtitle: "Finished topics stay handy for refreshers and review."
+                    )
                 }
             }
         }
         .listStyle(.plain)
+        .listSectionSpacing(22)
         .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
@@ -69,13 +68,16 @@ struct LibraryView: View {
             LinearGradient(
                 colors: [
                     BrieflyTheme.Colors.background(colorScheme),
-                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.2)
+                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.22),
+                    BrieflyTheme.Colors.background(colorScheme)
                 ],
-                startPoint: .top,
+                startPoint: .topLeading,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
         )
+        .navigationTitle("Library")
+        .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -128,7 +130,11 @@ struct LibraryView: View {
                 .accessibilityLabel("Generate with AI")
             }
         }
-        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search topics")
+        .searchable(
+            text: $viewModel.searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search topics"
+        )
         .sheet(isPresented: $showingAIGenerator) {
             AIGenerationSheet(isPresented: $showingAIGenerator) { _ in }
         }
@@ -177,22 +183,7 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func topicRow(_ topic: TopicPack) -> some View {
-        Button {
-            coordinator.showTopic(topic)
-        } label: {
-            TopicCardView(
-                topic: topic,
-                progress: viewModel.progress(for: topic)
-            )
-            .overlay(alignment: .topTrailing) {
-                if viewModel.isCompleted(topic) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(.green)
-                        .font(.caption)
-                        .padding(8)
-                }
-            }
-        }
+        libraryTopicButton(topic, variant: .standard)
         .buttonStyle(.plain)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -226,6 +217,244 @@ struct LibraryView: View {
         }
     }
 
+    private var overviewSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Resume your momentum")
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(BrieflyTheme.Colors.textPrimary)
+
+                    Text(hasAnyTopics
+                         ? "Continue where you left off, then explore a fresh topic when you're ready."
+                         : "Build your first topic pack and turn the library into a place worth returning to.")
+                        .font(.subheadline)
+                        .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 16)
+
+                if hasAnyTopics {
+                    Image(systemName: "sparkles.rectangle.stack.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(BrieflyTheme.Colors.accent)
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(BrieflyTheme.Colors.elevatedBackground(colorScheme))
+                        )
+                }
+            }
+
+            HStack(spacing: 12) {
+                insightPill(title: "Active", value: "\(viewModel.activeTopics.count)")
+                insightPill(title: "In Progress", value: "\(inProgressTopicCount)")
+                insightPill(title: "Completed", value: "\(viewModel.completedTopics.count)")
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            BrieflyTheme.Colors.cardBackground(colorScheme),
+                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(0.72)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
+                )
+                .shadow(color: BrieflyTheme.Colors.shadowSoft(colorScheme), radius: 14, x: 0, y: 10)
+        )
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 2, trailing: 16))
+        .listRowBackground(Color.clear)
+    }
+
+    private var activeFiltersRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Filtered Results")
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        chip(title: "Search: \(viewModel.searchText)") {
+                            viewModel.searchText = ""
+                        }
+                    }
+                    if let category = viewModel.selectedCategory {
+                        chip(title: "Category: \(category)") {
+                            viewModel.selectedCategory = nil
+                        }
+                    }
+                    if let difficulty = viewModel.selectedDifficulty {
+                        chip(title: "Difficulty: \(difficulty.rawValue)") {
+                            viewModel.selectedDifficulty = nil
+                        }
+                    }
+                    Button("Clear all") {
+                        clearFilters()
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+        .listRowBackground(Color.clear)
+    }
+
+    private var continueLearningSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionHeader(
+                title: "Continue Learning",
+                subtitle: "Recent and in-progress topics stay front and center."
+            )
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(viewModel.continueLearningTopics) { topic in
+                        libraryTopicButton(topic, variant: .continueLearning)
+                            .frame(width: 320)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+        .listRowBackground(Color.clear)
+    }
+
+    private func featuredSection(topic: TopicPack) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionHeader(
+                title: "Featured",
+                subtitle: viewModel.progress(for: topic) > 0
+                    ? "A premium shortcut back into your most relevant topic."
+                    : "A simple editorial pick based on your current library order."
+            )
+
+            libraryTopicButton(topic, variant: .featured)
+        }
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+        .listRowBackground(Color.clear)
+    }
+
+    private var exploreSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            sectionHeader(
+                title: "Explore Topics",
+                subtitle: "Browse by category instead of scrolling one long list."
+            )
+
+            ForEach(viewModel.exploreTopicGroups) { group in
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(group.title)
+                            .font(.headline.weight(.semibold))
+
+                        Spacer()
+
+                        Text("\(group.topics.count) topic\(group.topics.count == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(group.topics) { topic in
+                                libraryTopicButton(topic, variant: .standard)
+                                    .frame(width: 280)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
+        }
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 6, trailing: 16))
+        .listRowBackground(Color.clear)
+    }
+
+    private func sectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundColor(BrieflyTheme.Colors.textPrimary)
+
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func listSectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .foregroundColor(BrieflyTheme.Colors.textPrimary)
+
+            Text(subtitle)
+                .font(.footnote)
+                .foregroundColor(BrieflyTheme.Colors.textSecondary)
+        }
+        .textCase(nil)
+    }
+
+    private func insightPill(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.headline.weight(.bold))
+                .foregroundColor(BrieflyTheme.Colors.textPrimary)
+
+            Text(title)
+                .font(.caption)
+                .foregroundColor(BrieflyTheme.Colors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(BrieflyTheme.Colors.elevatedBackground(colorScheme))
+        )
+    }
+
+    @ViewBuilder
+    private func libraryTopicButton(_ topic: TopicPack, variant: TopicCardView.Variant) -> some View {
+        Button {
+            openTopic(topic)
+        } label: {
+            TopicCardView(
+                topic: topic,
+                progress: viewModel.progress(for: topic),
+                variant: variant
+            )
+            .overlay(alignment: .topTrailing) {
+                if viewModel.isCompleted(topic) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                        .padding(8)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     private func generateRandomTopic() async {
         guard !isGeneratingRandom else { return }
         isGeneratingRandom = true
@@ -235,7 +464,7 @@ struct LibraryView: View {
         do {
             if let topic = try await viewModel.generateRandomTopic(targetSections: 5, cardsPerSection: 10) {
                 await MainActor.run {
-                    coordinator.showTopic(topic)
+                    openTopic(topic)
                 }
             }
         } catch {
@@ -259,10 +488,19 @@ struct LibraryView: View {
             || viewModel.selectedDifficulty != nil
     }
 
+    private var inProgressTopicCount: Int {
+        viewModel.activeTopics.filter { viewModel.progress(for: $0) > 0 }.count
+    }
+
     private func clearFilters() {
         viewModel.selectedCategory = nil
         viewModel.selectedDifficulty = nil
         viewModel.searchText = ""
+    }
+
+    private func openTopic(_ topic: TopicPack) {
+        viewModel.recordTopicOpened(topic)
+        coordinator.showTopic(topic)
     }
 
     private var emptyState: some View {

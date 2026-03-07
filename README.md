@@ -43,8 +43,13 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 ## 🎛 How to Use
 
 ### Library
-- Your topics appear in **Active** and **Completed** sections.
-- Active search/filter chips appear at the top of the list and can be cleared individually.
+- The home screen now opens with a richer library layout:
+  - a progress overview
+  - a **Continue Learning** carousel driven by in-progress and recently opened topics
+  - a **Featured** topic card
+  - category-based **Explore Topics** rows
+- Your topics still remain available in **Your Order** and **Completed** sections.
+- Active search/filter chips appear near the top and can be cleared individually.
 - If filters/search remove all visible topics, Briefly shows a **No matching topics** state with a **Clear filters** action.
 - Reorder active topics with drag-and-drop.
 - Swipe:
@@ -103,6 +108,7 @@ Briefly is organized around a few simple layers:
 
 ### Progress
 - `ProgressStore` tracks learned card IDs and completed section IDs using `UserDefaults`.
+- `RecentTopicsStore` keeps a lightweight recent-topic ID list in `UserDefaults` so the library can surface resume-friendly cards without changing topic content or progress data.
 
 ### AI
 - `OpenAIClient` performs API requests.
@@ -144,6 +150,7 @@ Briefly/
 └── Store/
     ├── ContentDiskStore.swift
     ├── ProgressStore.swift
+    ├── RecentTopicsStore.swift
     ├── TopicStatusStore.swift
     └── TopicOrderStore.swift
 ```

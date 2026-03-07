@@ -3,6 +3,13 @@ import Combine
 
 @MainActor
 final class LibraryViewModel: ObservableObject {
+    struct TopicGroup: Identifiable {
+        let title: String
+        let topics: [TopicPack]
+
+        var id: String { title }
+    }
+
     @Published private(set) var topics: [TopicPack] = []
     @Published var searchText: String = ""
     @Published var selectedCategory: String?
@@ -11,16 +18,19 @@ final class LibraryViewModel: ObservableObject {
     private let contentRepository: ContentRepository
     private let progressStore: ProgressStore
     private let statusStore: TopicStatusStore
+    private let recentTopicsStore: RecentTopicsStore
     private var cancellables = Set<AnyCancellable>()
 
     init(
         contentRepository: ContentRepository,
         progressStore: ProgressStore,
-        statusStore: TopicStatusStore? = nil
+        statusStore: TopicStatusStore? = nil,
+        recentTopicsStore: RecentTopicsStore? = nil
     ) {
         self.contentRepository = contentRepository
         self.progressStore = progressStore
         self.statusStore = statusStore ?? .shared
+        self.recentTopicsStore = recentTopicsStore ?? .shared
         self.topics = contentRepository.topics
 
         contentRepository.$topics
@@ -31,6 +41,27 @@ final class LibraryViewModel: ObservableObject {
             .store(in: &cancellables)
 
         self.statusStore.$completedIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        self.progressStore.$learnedCardIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        self.progressStore.$completedSectionIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        self.recentTopicsStore.$topicIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
@@ -69,6 +100,60 @@ final class LibraryViewModel: ObservableObject {
 
     var completedTopics: [TopicPack] {
         filteredTopics.filter { isCompleted($0) }
+    }
+
+    var continueLearningTopics: [TopicPack] {
+        let visibleActiveTopics = activeTopics
+        guard !visibleActiveTopics.isEmpty else { return [] }
+
+        let visibleByID = Dictionary(uniqueKeysWithValues: visibleActiveTopics.map { ($0.id, $0) })
+
+        var orderedTopics: [TopicPack] = []
+        var seenIDs = Set<String>()
+
+        for id in recentTopicsStore.topicIDs {
+            guard let topic = visibleByID[id], shouldHighlightForResume(topic), seenIDs.insert(topic.id).inserted else {
+                continue
+            }
+            orderedTopics.append(topic)
+        }
+
+        let progressCandidates = visibleActiveTopics.filter { shouldHighlightForResume($0) }
+        for topic in progressCandidates where seenIDs.insert(topic.id).inserted {
+            orderedTopics.append(topic)
+        }
+
+        if orderedTopics.isEmpty {
+            return Array(visibleActiveTopics.prefix(5))
+        }
+
+        return Array(orderedTopics.prefix(8))
+    }
+
+    var featuredTopic: TopicPack? {
+        continueLearningTopics.first ?? activeTopics.first ?? completedTopics.first
+    }
+
+    func featuredProgress() -> Double {
+        guard let featuredTopic else { return 0 }
+        return progress(for: featuredTopic)
+    }
+
+    var exploreTopicGroups: [TopicGroup] {
+        let groupedTopics = Dictionary(grouping: activeTopics, by: \.category)
+
+        return groupedTopics
+            .map { TopicGroup(title: $0.key, topics: $0.value) }
+            .sorted { lhs, rhs in
+                if lhs.topics.count == rhs.topics.count {
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+                return lhs.topics.count > rhs.topics.count
+            }
+    }
+
+    func recordTopicOpened(_ topic: TopicPack) {
+        recentTopicsStore.recordOpened(topicID: topic.id)
     }
 
     func delete(_ topic: TopicPack) throws {
@@ -197,6 +282,11 @@ final class LibraryViewModel: ObservableObject {
                 return "Please set your OpenAI API key in Settings."
             }
         }
+    }
+
+    private func shouldHighlightForResume(_ topic: TopicPack) -> Bool {
+        progress(for: topic) > 0
+            || recentTopicsStore.topicIDs.contains(where: { $0.caseInsensitiveCompare(topic.id) == .orderedSame })
     }
 
     private func makeUnique(dto: TopicPackDTO, existingIDs: Set<String>, existingTitles: Set<String>) -> TopicPackDTO {
