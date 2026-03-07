@@ -38,6 +38,15 @@ struct TopicCardView: View {
         }
     }
 
+    private var titleLineLimit: Int {
+        switch variant {
+        case .featured:
+            return 3
+        case .continueLearning, .standard:
+            return 2
+        }
+    }
+
     private var titleFont: Font {
         switch variant {
         case .standard:
@@ -45,7 +54,7 @@ struct TopicCardView: View {
         case .continueLearning:
             return .system(.title2, design: .rounded).weight(.bold)
         case .featured:
-            return .system(.largeTitle, design: .rounded).weight(.bold)
+            return .system(size: 36, weight: .bold, design: .rounded)
         }
     }
 
@@ -54,14 +63,22 @@ struct TopicCardView: View {
         case .standard:
             return "Topic"
         case .continueLearning:
-            return progress > 0 ? "Continue Learning" : "Start Here"
+            return ""
         case .featured:
-            return progress > 0 ? "Featured To Resume" : "Featured Topic"
+            return progress > 0 ? "Featured To Resume" : "Editorial Pick"
         }
     }
 
     private var actionLabel: String {
         progress > 0 ? "Continue" : "Explore"
+    }
+
+    private var showsEyebrow: Bool {
+        !sectionEyebrow.isEmpty
+    }
+
+    private var showsActionChip: Bool {
+        variant == .featured
     }
 
     private var metadataFont: Font {
@@ -76,11 +93,42 @@ struct TopicCardView: View {
     private var verticalSpacing: CGFloat {
         switch variant {
         case .featured:
-            return 20
+            return 24
         case .continueLearning:
-            return 16
+            return 14
         case .standard:
             return 14
+        }
+    }
+
+    private var cardPadding: CGFloat {
+        switch variant {
+        case .featured:
+            return 24
+        case .continueLearning:
+            return 20
+        case .standard:
+            return BrieflyTheme.Layout.cardPadding
+        }
+    }
+
+    private var minimumCardHeight: CGFloat? {
+        switch variant {
+        case .featured:
+            return 250
+        case .continueLearning:
+            return 220
+        case .standard:
+            return nil
+        }
+    }
+
+    private var subtitleFont: Font {
+        switch variant {
+        case .featured:
+            return .body
+        case .continueLearning, .standard:
+            return .subheadline
         }
     }
 
@@ -93,31 +141,34 @@ struct TopicCardView: View {
                 header
 
                 VStack(alignment: .leading, spacing: isEmphasized ? 8 : 6) {
-                    Text(sectionEyebrow)
-                        .font(.caption.weight(.bold))
-                        .textCase(.uppercase)
-                        .tracking(1.0)
-                        .foregroundColor(cardTertiaryText)
+                    if showsEyebrow {
+                        Text(sectionEyebrow)
+                            .font(.caption.weight(.bold))
+                            .textCase(.uppercase)
+                            .tracking(1.0)
+                            .foregroundColor(cardTertiaryText)
+                    }
 
                     Text(topic.title)
                         .font(titleFont)
                         .foregroundColor(cardPrimaryText)
-                        .lineLimit(isEmphasized ? 3 : 2)
+                        .lineLimit(titleLineLimit)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(topic.subtitle)
-                        .font(isEmphasized ? .body : .subheadline)
+                        .font(subtitleFont)
                         .foregroundColor(cardSecondaryText)
                         .lineLimit(subtitleLineLimit)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 metadata
+                    .padding(.top, variant == .featured ? 8 : 0)
                 progressSection
             }
-            .padding(isEmphasized ? 20 : BrieflyTheme.Layout.cardPadding)
+            .padding(cardPadding)
         }
-        .frame(maxWidth: .infinity, minHeight: isEmphasized ? 220 : nil, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: minimumCardHeight, alignment: .leading)
         .contentShape(RoundedRectangle(cornerRadius: BrieflyTheme.Layout.cardCornerRadius))
     }
 
@@ -139,7 +190,7 @@ struct TopicCardView: View {
 
             Spacer(minLength: 12)
 
-            if isEmphasized {
+            if showsActionChip {
                 Label(actionLabel, systemImage: "arrow.right")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(cardPrimaryText)
@@ -185,11 +236,13 @@ struct TopicCardView: View {
     }
 
     private var progressSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: variant == .featured ? 12 : 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(progress > 0 ? "Progress" : "Ready to start")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(cardPrimaryText)
+                if variant != .continueLearning {
+                    Text(progress > 0 ? "Progress" : "New Topic")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(cardPrimaryText)
+                }
 
                 Spacer()
 
@@ -211,6 +264,7 @@ struct TopicCardView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(.top, variant == .featured ? 4 : 0)
     }
 
     private var cardBackground: some View {
@@ -230,10 +284,10 @@ struct TopicCardView: View {
             }
             .overlay(alignment: .topLeading) {
                 Circle()
-                    .fill(style.highlight(for: colorScheme).opacity(colorScheme == .dark ? 0.40 : 0.28))
-                    .frame(width: isEmphasized ? 220 : 150, height: isEmphasized ? 220 : 150)
-                    .blur(radius: isEmphasized ? 22 : 18)
-                    .offset(x: -34, y: -44)
+                    .fill(style.highlight(for: colorScheme).opacity(colorScheme == .dark ? 0.38 : 0.26))
+                    .frame(width: variant == .featured ? 250 : (isEmphasized ? 220 : 150), height: variant == .featured ? 250 : (isEmphasized ? 220 : 150))
+                    .blur(radius: variant == .featured ? 28 : (isEmphasized ? 22 : 18))
+                    .offset(x: -38, y: -52)
                     .allowsHitTesting(false)
             }
             .overlay {
@@ -243,10 +297,10 @@ struct TopicCardView: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 Circle()
-                    .fill(style.ambient(for: colorScheme).opacity(colorScheme == .dark ? 0.32 : 0.22))
-                    .frame(width: isEmphasized ? 170 : 120, height: isEmphasized ? 170 : 120)
-                    .blur(radius: isEmphasized ? 30 : 24)
-                    .offset(x: 42, y: 58)
+                    .fill(style.ambient(for: colorScheme).opacity(variant == .featured ? 0.28 : (colorScheme == .dark ? 0.32 : 0.22)))
+                    .frame(width: variant == .featured ? 190 : (isEmphasized ? 170 : 120), height: variant == .featured ? 190 : (isEmphasized ? 170 : 120))
+                    .blur(radius: variant == .featured ? 34 : (isEmphasized ? 30 : 24))
+                    .offset(x: 46, y: 64)
                     .allowsHitTesting(false)
             }
             .overlay(
@@ -272,16 +326,16 @@ struct TopicCardView: View {
             if isEmphasized {
                 ZStack {
                     Circle()
-                        .fill(style.ambient(for: colorScheme).opacity(variant == .featured ? 0.34 : 0.24))
+                        .fill(style.ambient(for: colorScheme).opacity(variant == .featured ? 0.30 : 0.20))
                         .frame(
-                            width: variant == .featured ? 210 : 160,
-                            height: variant == .featured ? 210 : 160
+                            width: variant == .featured ? 250 : 154,
+                            height: variant == .featured ? 250 : 154
                         )
-                        .blur(radius: variant == .featured ? 24 : 18)
+                        .blur(radius: variant == .featured ? 28 : 18)
 
                     Image(systemName: style.symbolName)
                         .font(.system(
-                            size: variant == .featured ? 88 : 68,
+                            size: variant == .featured ? 108 : 62,
                             weight: .semibold,
                             design: .rounded
                         ))
@@ -296,10 +350,10 @@ struct TopicCardView: View {
                             )
                         )
                         .shadow(color: Color.white.opacity(0.12), radius: 18, x: 0, y: 0)
-                        .opacity(variant == .featured ? 0.18 : 0.14)
+                        .opacity(variant == .featured ? 0.16 : 0.11)
                 }
-                .padding(.top, variant == .featured ? -20 : -4)
-                .padding(.trailing, variant == .featured ? -14 : 4)
+                .padding(.top, variant == .featured ? -30 : -6)
+                .padding(.trailing, variant == .featured ? -24 : 0)
             }
         }
         .allowsHitTesting(false)

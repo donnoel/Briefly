@@ -60,7 +60,7 @@ struct LibraryView: View {
             }
         }
         .listStyle(.plain)
-        .listSectionSpacing(20)
+        .listSectionSpacing(18)
         .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
@@ -173,7 +173,7 @@ struct LibraryView: View {
     @ViewBuilder
     private func topicRow(_ topic: TopicPack) -> some View {
         libraryTopicButton(topic, variant: .standard)
-        .buttonStyle(.plain)
+        .buttonStyle(LibraryCardButtonStyle())
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
         .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
@@ -328,7 +328,7 @@ struct LibraryView: View {
     }
 
     private var continueLearningSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             sectionHeader(
                 title: "Continue Learning",
                 subtitle: "Recent and in-progress topics stay front and center."
@@ -341,16 +341,16 @@ struct LibraryView: View {
                             .frame(width: 320)
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, 1)
             }
         }
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 3, trailing: 16))
         .listRowBackground(Color.clear)
     }
 
     private func featuredSection(topic: TopicPack) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             sectionHeader(
                 title: "Featured",
                 subtitle: viewModel.progress(for: topic) > 0
@@ -361,12 +361,12 @@ struct LibraryView: View {
             libraryTopicButton(topic, variant: .featured)
         }
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 3, trailing: 16))
         .listRowBackground(Color.clear)
     }
 
     private var exploreSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             sectionHeader(
                 title: "Explore Topics",
                 subtitle: "Browse by category instead of scrolling one long list."
@@ -378,13 +378,17 @@ struct LibraryView: View {
                         let style = BrieflyTheme.Colors.topicStyle(for: group.title)
 
                         Label(group.title, systemImage: style.symbolName)
-                            .font(.headline.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundColor(BrieflyTheme.Colors.textPrimary)
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 9)
                             .background(
                                 Capsule()
-                                    .fill(style.ambient(for: colorScheme).opacity(colorScheme == .dark ? 0.24 : 0.14))
+                                    .fill(style.ambient(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.12))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(style.highlight(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.16))
+                                    )
                             )
 
                         Spacer()
@@ -401,13 +405,13 @@ struct LibraryView: View {
                                     .frame(width: 280)
                             }
                         }
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 1)
                     }
                 }
             }
         }
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 6, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 5, trailing: 16))
         .listRowBackground(Color.clear)
     }
 
@@ -484,7 +488,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LibraryCardButtonStyle())
     }
 
     private func generateRandomTopic() async {
@@ -612,9 +616,9 @@ struct LibraryView: View {
                 ],
                 center: .topLeading,
                 startRadius: 30,
-                endRadius: 380
+                endRadius: 420
             )
-            .offset(x: -40, y: -70)
+            .offset(x: -36, y: -76)
 
             RadialGradient(
                 colors: [
@@ -623,9 +627,9 @@ struct LibraryView: View {
                 ],
                 center: .topTrailing,
                 startRadius: 20,
-                endRadius: 320
+                endRadius: 340
             )
-            .offset(x: 40, y: 140)
+            .offset(x: 48, y: 120)
 
             RadialGradient(
                 colors: [
@@ -634,20 +638,45 @@ struct LibraryView: View {
                 ],
                 center: .bottomLeading,
                 startRadius: 20,
-                endRadius: 260
+                endRadius: 300
             )
-            .offset(x: -80, y: 220)
+            .offset(x: -72, y: 220)
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(colorScheme == .dark ? 0.02 : 0.10),
-                    .clear,
-                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.04 : 0.07)
+                    BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.06 : 0.08),
+                    Color.white.opacity(colorScheme == .dark ? 0.02 : 0.08),
+                    .clear
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    BrieflyTheme.Colors.libraryAmbientSecondary(colorScheme).opacity(colorScheme == .dark ? 0.06 : 0.05),
+                    BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme).opacity(colorScheme == .dark ? 0.05 : 0.04)
+                ],
+                startPoint: .top,
+                endPoint: .bottomTrailing
+            )
         }
         .ignoresSafeArea()
+    }
+}
+
+private struct LibraryCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .brightness(configuration.isPressed ? -0.02 : 0)
+            .shadow(
+                color: Color.black.opacity(configuration.isPressed ? 0.12 : 0),
+                radius: configuration.isPressed ? 18 : 0,
+                x: 0,
+                y: configuration.isPressed ? 10 : 0
+            )
+            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: configuration.isPressed)
     }
 }
