@@ -10,7 +10,7 @@ struct LibraryView: View {
     @State private var isGeneratingRandom = false
     @State private var randomError: String?
     @State private var libraryError: String?
-    @State private var overviewMinY: CGFloat = 0
+    @State private var libraryCompactHeaderVisible = false
 
     var body: some View {
         List {
@@ -68,7 +68,12 @@ struct LibraryView: View {
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
         .animation(.easeInOut(duration: 0.25), value: viewModel.completedTopics.count)
         .background(libraryBackground)
-        .onPreferenceChange(LibraryOverviewOffsetKey.self) { overviewMinY = $0 }
+        .onPreferenceChange(LibraryOverviewOffsetKey.self) { minY in
+            let shouldShowCompactHeader = minY < -72
+            if shouldShowCompactHeader != libraryCompactHeaderVisible {
+                libraryCompactHeaderVisible = shouldShowCompactHeader
+            }
+        }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
@@ -263,7 +268,7 @@ struct LibraryView: View {
 
             HStack(spacing: 12) {
                 insightPill(title: "Active", value: "\(viewModel.activeTopics.count)")
-                insightPill(title: "In Progress", value: "\(inProgressTopicCount)")
+                insightPill(title: "In Progress", value: "\(viewModel.inProgressTopicCount)")
                 insightPill(title: "Completed", value: "\(viewModel.completedTopics.count)")
             }
         }
@@ -541,10 +546,6 @@ struct LibraryView: View {
             || viewModel.selectedDifficulty != nil
     }
 
-    private var inProgressTopicCount: Int {
-        viewModel.activeTopics.filter { viewModel.progress(for: $0) > 0 }.count
-    }
-
     private func clearFilters() {
         viewModel.selectedCategory = nil
         viewModel.selectedDifficulty = nil
@@ -680,10 +681,6 @@ struct LibraryView: View {
             )
         }
         .ignoresSafeArea()
-    }
-
-    private var libraryCompactHeaderVisible: Bool {
-        overviewMinY < -72
     }
 
     private var compactLibraryHeader: some View {

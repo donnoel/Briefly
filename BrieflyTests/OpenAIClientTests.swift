@@ -13,11 +13,11 @@ struct OpenAIClientTests {
 
         do {
             _ = try await client.chatCompletion(messages: sampleMessages)
-            #expect(false)
+            #expect(Bool(false))
             return
         } catch let error as OpenAIClient.ClientError {
             guard case let .badResponse(status, body) = error else {
-                #expect(false)
+                #expect(Bool(false))
                 return
             }
 
@@ -37,11 +37,11 @@ struct OpenAIClientTests {
 
         do {
             _ = try await client.chatCompletion(messages: sampleMessages)
-            #expect(false)
+            #expect(Bool(false))
             return
         } catch let error as OpenAIClient.ClientError {
             guard case .requestTimedOut = error else {
-                #expect(false)
+                #expect(Bool(false))
                 return
             }
         }
@@ -58,11 +58,11 @@ struct OpenAIClientTests {
 
         do {
             _ = try await client.chatCompletion(messages: sampleMessages)
-            #expect(false)
+            #expect(Bool(false))
             return
         } catch let error as OpenAIClient.ClientError {
             guard case let .transport(underlying) = error else {
-                #expect(false)
+                #expect(Bool(false))
                 return
             }
 
@@ -82,9 +82,11 @@ struct OpenAIClientTests {
         let client = makeClient(session: transport.session, host: transport.host)
 
         let response = try await client.chatCompletion(messages: sampleMessages)
+        let choiceCount = await response.choices.count
+        let firstContent = await response.choices.first?.message.content
 
-        #expect(response.choices.count == 1)
-        #expect(response.choices.first?.message.content == "{\"ok\":true}")
+        #expect(choiceCount == 1)
+        #expect(firstContent == "{\"ok\":true}")
         #expect(MockURLProtocol.currentRequestCount(for: transport.host) == 2)
     }
 

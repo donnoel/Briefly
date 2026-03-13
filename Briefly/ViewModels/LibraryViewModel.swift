@@ -10,10 +10,31 @@ final class LibraryViewModel: ObservableObject {
         var id: String { title }
     }
 
-    @Published private(set) var topics: [TopicPack] = []
-    @Published var searchText: String = ""
-    @Published var selectedCategory: String?
-    @Published var selectedDifficulty: Difficulty?
+    private struct DerivedState {
+        var availableCategories: [String] = []
+        var filteredTopics: [TopicPack] = []
+        var activeTopics: [TopicPack] = []
+        var completedTopics: [TopicPack] = []
+        var continueLearningTopics: [TopicPack] = []
+        var featuredTopic: TopicPack?
+        var exploreTopicGroups: [TopicGroup] = []
+        var inProgressTopicCount: Int = 0
+        var progressByTopicID: [String: Double] = [:]
+    }
+
+    @Published private(set) var topics: [TopicPack] = [] {
+        didSet { recomputeDerivedState() }
+    }
+    @Published var searchText: String = "" {
+        didSet { recomputeDerivedState() }
+    }
+    @Published var selectedCategory: String? {
+        didSet { recomputeDerivedState() }
+    }
+    @Published var selectedDifficulty: Difficulty? {
+        didSet { recomputeDerivedState() }
+    }
+    @Published private var derivedState = DerivedState()
 
     private let contentRepository: ContentRepository
     private let progressStore: ProgressStore
@@ -43,113 +64,54 @@ final class LibraryViewModel: ObservableObject {
         self.statusStore.$completedIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.objectWillChange.send()
+                self?.recomputeDerivedState()
             }
             .store(in: &cancellables)
 
         self.progressStore.$learnedCardIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.objectWillChange.send()
+                self?.recomputeDerivedState()
             }
             .store(in: &cancellables)
 
         self.progressStore.$completedSectionIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.objectWillChange.send()
+                self?.recomputeDerivedState()
             }
             .store(in: &cancellables)
 
         self.recentTopicsStore.$topicIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.objectWillChange.send()
+                self?.recomputeDerivedState()
             }
             .store(in: &cancellables)
+
+        recomputeDerivedState()
     }
 
     func progress(for topic: TopicPack) -> Double {
-        progressStore.progress(for: topic)
+        derivedState.progressByTopicID[topic.id] ?? progressStore.progress(for: topic)
     }
 
     func refresh() {
         topics = contentRepository.topics
     }
 
-    var availableCategories: [String] {
-        Array(Set(topics.map { $0.category })).sorted()
-    }
-
-    var filteredTopics: [TopicPack] {
-        topics.filter { topic in
-            if let category = selectedCategory, category != topic.category { return false }
-            if let difficulty = selectedDifficulty, difficulty != topic.difficulty { return false }
-
-            if searchText.isEmpty { return true }
-            let query = searchText.lowercased()
-            return topic.title.lowercased().contains(query)
-                || topic.subtitle.lowercased().contains(query)
-                || topic.category.lowercased().contains(query)
-        }
-    }
-
-    var activeTopics: [TopicPack] {
-        filteredTopics.filter { !isCompleted($0) }
-    }
-
-    var completedTopics: [TopicPack] {
-        filteredTopics.filter { isCompleted($0) }
-    }
-
-    var continueLearningTopics: [TopicPack] {
-        let visibleActiveTopics = activeTopics
-        guard !visibleActiveTopics.isEmpty else { return [] }
-
-        let visibleByID = Dictionary(uniqueKeysWithValues: visibleActiveTopics.map { ($0.id, $0) })
-
-        var orderedTopics: [TopicPack] = []
-        var seenIDs = Set<String>()
-
-        for id in recentTopicsStore.topicIDs {
-            guard let topic = visibleByID[id], shouldHighlightForResume(topic), seenIDs.insert(topic.id).inserted else {
-                continue
-            }
-            orderedTopics.append(topic)
-        }
-
-        let progressCandidates = visibleActiveTopics.filter { shouldHighlightForResume($0) }
-        for topic in progressCandidates where seenIDs.insert(topic.id).inserted {
-            orderedTopics.append(topic)
-        }
-
-        if orderedTopics.isEmpty {
-            return Array(visibleActiveTopics.prefix(5))
-        }
-
-        return Array(orderedTopics.prefix(8))
-    }
-
-    var featuredTopic: TopicPack? {
-        continueLearningTopics.first ?? activeTopics.first ?? completedTopics.first
-    }
+    var availableCategories: [String] { derivedState.availableCategories }
+    var filteredTopics: [TopicPack] { derivedState.filteredTopics }
+    var activeTopics: [TopicPack] { derivedState.activeTopics }
+    var completedTopics: [TopicPack] { derivedState.completedTopics }
+    var continueLearningTopics: [TopicPack] { derivedState.continueLearningTopics }
+    var featuredTopic: TopicPack? { derivedState.featuredTopic }
+    var exploreTopicGroups: [TopicGroup] { derivedState.exploreTopicGroups }
+    var inProgressTopicCount: Int { derivedState.inProgressTopicCount }
 
     func featuredProgress() -> Double {
         guard let featuredTopic else { return 0 }
         return progress(for: featuredTopic)
-    }
-
-    var exploreTopicGroups: [TopicGroup] {
-        let groupedTopics = Dictionary(grouping: activeTopics, by: \.category)
-
-        return groupedTopics
-            .map { TopicGroup(title: $0.key, topics: $0.value) }
-            .sorted { lhs, rhs in
-                if lhs.topics.count == rhs.topics.count {
-                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
-                }
-                return lhs.topics.count > rhs.topics.count
-            }
     }
 
     func recordTopicOpened(_ topic: TopicPack) {
@@ -284,9 +246,100 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
-    private func shouldHighlightForResume(_ topic: TopicPack) -> Bool {
-        progress(for: topic) > 0
-            || recentTopicsStore.topicIDs.contains(where: { $0.caseInsensitiveCompare(topic.id) == .orderedSame })
+    private func recomputeDerivedState() {
+        let categories = Array(Set(topics.map(\.category))).sorted()
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        let filtered = topics.filter { topic in
+            if let category = selectedCategory, category != topic.category { return false }
+            if let difficulty = selectedDifficulty, difficulty != topic.difficulty { return false }
+            guard !query.isEmpty else { return true }
+            return topic.title.lowercased().contains(query)
+                || topic.subtitle.lowercased().contains(query)
+                || topic.category.lowercased().contains(query)
+        }
+
+        var active: [TopicPack] = []
+        var completed: [TopicPack] = []
+        active.reserveCapacity(filtered.count)
+        completed.reserveCapacity(filtered.count)
+        for topic in filtered {
+            if statusStore.isCompleted(topic.id) {
+                completed.append(topic)
+            } else {
+                active.append(topic)
+            }
+        }
+
+        var progressByTopicID: [String: Double] = [:]
+        progressByTopicID.reserveCapacity(topics.count)
+        for topic in topics {
+            progressByTopicID[topic.id] = progressStore.progress(for: topic)
+        }
+
+        let recentIDs = recentTopicsStore.topicIDs
+        let recentLowercasedIDs = Set(recentIDs.map { $0.lowercased() })
+
+        var continueLearning: [TopicPack] = []
+        if !active.isEmpty {
+            let visibleByID = Dictionary(uniqueKeysWithValues: active.map { ($0.id, $0) })
+            var seenIDs = Set<String>()
+
+            for id in recentIDs {
+                guard let topic = visibleByID[id],
+                      shouldHighlightForResume(topic, progressByTopicID: progressByTopicID, recentLowercasedIDs: recentLowercasedIDs),
+                      seenIDs.insert(topic.id).inserted
+                else {
+                    continue
+                }
+                continueLearning.append(topic)
+            }
+
+            for topic in active where shouldHighlightForResume(topic, progressByTopicID: progressByTopicID, recentLowercasedIDs: recentLowercasedIDs) {
+                guard seenIDs.insert(topic.id).inserted else { continue }
+                continueLearning.append(topic)
+            }
+
+            continueLearning = continueLearning.isEmpty
+                ? Array(active.prefix(5))
+                : Array(continueLearning.prefix(8))
+        }
+
+        let exploreGroups = Dictionary(grouping: active, by: \.category)
+            .map { TopicGroup(title: $0.key, topics: $0.value) }
+            .sorted { lhs, rhs in
+                if lhs.topics.count == rhs.topics.count {
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+                return lhs.topics.count > rhs.topics.count
+            }
+
+        let inProgressCount = active.reduce(into: 0) { count, topic in
+            if (progressByTopicID[topic.id] ?? 0) > 0 {
+                count += 1
+            }
+        }
+
+        derivedState = DerivedState(
+            availableCategories: categories,
+            filteredTopics: filtered,
+            activeTopics: active,
+            completedTopics: completed,
+            continueLearningTopics: continueLearning,
+            featuredTopic: continueLearning.first ?? active.first ?? completed.first,
+            exploreTopicGroups: exploreGroups,
+            inProgressTopicCount: inProgressCount,
+            progressByTopicID: progressByTopicID
+        )
+    }
+
+    private func shouldHighlightForResume(
+        _ topic: TopicPack,
+        progressByTopicID: [String: Double],
+        recentLowercasedIDs: Set<String>
+    ) -> Bool {
+        (progressByTopicID[topic.id] ?? 0) > 0
+            || recentLowercasedIDs.contains(topic.id.lowercased())
     }
 
     private func makeUnique(dto: TopicPackDTO, existingIDs: Set<String>, existingTitles: Set<String>) -> TopicPackDTO {

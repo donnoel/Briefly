@@ -136,6 +136,94 @@ struct ContentRepositoryTests {
         #expect(!secondLaunch.isCompleted(relaunchedTopic))
     }
 
+    @Test
+    func libraryViewModelUpdatesInProgressCountAfterLearningCard() async throws {
+        let defaults = makeIsolatedDefaults()
+        let progressDefaults = makeIsolatedDefaults()
+        let recentDefaults = makeIsolatedDefaults()
+        let progressStore = ProgressStore(defaults: progressDefaults)
+        let statusStore = TopicStatusStore(defaults: defaults)
+        let orderStore = TopicOrderStore(defaults: defaults)
+        let disk = InMemoryDiskStore(
+            seed: [],
+            user: [
+                makeDTO(id: "alpha", title: "Alpha"),
+                makeDTO(id: "beta", title: "Beta")
+            ]
+        )
+        let repository = ContentRepository(
+            diskStore: disk,
+            statusStore: statusStore,
+            orderStore: orderStore,
+            progressStore: progressStore,
+            cloudSyncService: NoopCloudSyncService()
+        )
+        let recentStore = RecentTopicsStore(defaults: recentDefaults)
+        let viewModel = LibraryViewModel(
+            contentRepository: repository,
+            progressStore: progressStore,
+            statusStore: statusStore,
+            recentTopicsStore: recentStore
+        )
+
+        #expect(viewModel.inProgressTopicCount == 0)
+
+        let alpha = try #require(viewModel.activeTopics.first(where: { $0.id == "alpha" }))
+        let alphaCard = try #require(alpha.sections.first?.cards.first)
+        progressStore.markLearned(alphaCard)
+        await Task.yield()
+        await Task.yield()
+
+        #expect(viewModel.inProgressTopicCount == 1)
+        #expect(viewModel.progress(for: alpha) > 0)
+    }
+
+    @Test
+    func libraryViewModelPrioritizesRecentTopicsForContinueLearning() async throws {
+        let defaults = makeIsolatedDefaults()
+        let progressDefaults = makeIsolatedDefaults()
+        let recentDefaults = makeIsolatedDefaults()
+        let progressStore = ProgressStore(defaults: progressDefaults)
+        let statusStore = TopicStatusStore(defaults: defaults)
+        let orderStore = TopicOrderStore(defaults: defaults)
+        let disk = InMemoryDiskStore(
+            seed: [],
+            user: [
+                makeDTO(id: "alpha", title: "Alpha"),
+                makeDTO(id: "beta", title: "Beta")
+            ]
+        )
+        let repository = ContentRepository(
+            diskStore: disk,
+            statusStore: statusStore,
+            orderStore: orderStore,
+            progressStore: progressStore,
+            cloudSyncService: NoopCloudSyncService()
+        )
+        let recentStore = RecentTopicsStore(defaults: recentDefaults)
+        let viewModel = LibraryViewModel(
+            contentRepository: repository,
+            progressStore: progressStore,
+            statusStore: statusStore,
+            recentTopicsStore: recentStore
+        )
+
+        for topic in viewModel.activeTopics {
+            if let card = topic.sections.first?.cards.first {
+                progressStore.markLearned(card)
+            }
+        }
+        await Task.yield()
+        await Task.yield()
+
+        recentStore.recordOpened(topicID: "beta")
+        recentStore.recordOpened(topicID: "alpha")
+        await Task.yield()
+        await Task.yield()
+
+        #expect(Array(viewModel.continueLearningTopics.prefix(2)).map(\.id) == ["alpha", "beta"])
+    }
+
     private func makeRepository(
         disk: InMemoryDiskStore,
         defaults: UserDefaults,
@@ -223,4 +311,14 @@ private final class InMemoryDiskStore: ContentDiskStoring {
         saveCallCount += 1
         user = packs
     }
+}
+
+private actor NoopCloudSyncService: CloudTopicSyncing {
+    func fetchState() async throws -> CloudTopicState? {
+        nil
+    }
+
+    func saveState(_ state: CloudTopicState) async throws {}
+
+    func ensureChangeSubscription() async {}
 }

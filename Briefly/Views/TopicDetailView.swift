@@ -6,7 +6,7 @@ struct TopicDetailView: View {
     @ObservedObject var viewModel: TopicDetailViewModel
     let topicTransition: Namespace.ID
 
-    @State private var heroMinY: CGFloat = 0
+    @State private var compactHeaderVisible = false
 
     private var style: BrieflyTheme.TopicVisualStyle {
         BrieflyTheme.Colors.topicStyle(for: viewModel.topic.category)
@@ -22,10 +22,6 @@ struct TopicDetailView: View {
 
     private var progressPercent: Int {
         Int((progressFraction * 100).rounded())
-    }
-
-    private var compactHeaderVisible: Bool {
-        heroMinY < -120
     }
 
     var body: some View {
@@ -51,7 +47,12 @@ struct TopicDetailView: View {
         }
         .coordinateSpace(name: "topicDetailScroll")
         .background(topicBackground)
-        .onPreferenceChange(TopicHeroOffsetKey.self) { heroMinY = $0 }
+        .onPreferenceChange(TopicHeroOffsetKey.self) { minY in
+            let shouldShowCompactHeader = minY < -120
+            if shouldShowCompactHeader != compactHeaderVisible {
+                compactHeaderVisible = shouldShowCompactHeader
+            }
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
