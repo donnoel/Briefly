@@ -45,6 +45,11 @@ struct DeckView: View {
         Int((progressFraction * 100).rounded())
     }
 
+    private var advanceButtonTitle: String {
+        guard !viewModel.cards.isEmpty else { return "Next" }
+        return viewModel.currentIndex >= viewModel.cards.count - 1 ? "Finish section" : "Next"
+    }
+
     var body: some View {
         VStack(spacing: 18) {
             headerView
@@ -205,7 +210,7 @@ struct DeckView: View {
                         BrieflyHaptics.soft()
                         viewModel.markKnownAndAdvance()
                     } label: {
-                        Text("Got it")
+                        Text(advanceButtonTitle)
                     }
                     .buttonStyle(BrieflyDeckPrimaryButtonStyle())
                 }

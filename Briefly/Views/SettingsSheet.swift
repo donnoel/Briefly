@@ -59,15 +59,9 @@ struct SettingsSheet: View {
                 }
 
                 Section("About") {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text(appVersion)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Link("Send Feedback", destination: feedbackURL)
-                        .foregroundColor(.accentColor)
+                    Text("v\(appVersion)")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .navigationTitle("Settings")
@@ -120,13 +114,6 @@ struct SettingsSheet: View {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
         return "\(version) (\(build))"
-    }
-
-    private var feedbackURL: URL {
-        let subject = "Tell us about your Briefly experience"
-        let email = "donnoel@icloud.com"
-        let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject
-        return URL(string: "mailto:\(email)?subject=\(encodedSubject)")!
     }
 
     private var keyStatusText: String {

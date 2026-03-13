@@ -17,7 +17,7 @@
 You can:
 - browse your library of topics,
 - jump into a section as a “deck session”,
-- reveal answers, then mark cards as **Got it** or **Review again**,
+- reveal answers, then mark cards as **Next** (or **Finish section** on the last card) or **Review again**,
 - track progress over time.
 
 If you want new material, Briefly can **generate a full topic pack using the OpenAI API**, then lets you **review/edit it before saving**.
@@ -31,7 +31,7 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 | 🧠 **Topic Packs** | Topics are organized into sections, each containing flashcards (front/back). |
 | 🎴 **Deck Sessions** | Review one section at a time with a clean “reveal then rate” flow. |
 | ✅ **Progress Tracking** | Remembers learned cards + completed sections and shows progress per topic. |
-| 🔁 **Review Loop** | Mark **Got it** to advance, or **Review again** to repeat. |
+| 🔁 **Review Loop** | Mark **Next** to advance (or **Finish section** on the last card), or **Review again** to repeat. |
 | 🪄 **AI Topic Generation** | Generate multi-section packs (with card sources/tags) using OpenAI. |
 | 🧾 **Review Before Save** | Generated packs open in a review screen so you can refine before saving. |
 | ☁️ **iCloud Topic Sync** | User-created topics and topic order sync through your private iCloud database across devices on the same Apple ID, including CloudKit push refresh. |
@@ -66,7 +66,7 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 ### Deck Session
 - Tap the card (or **See answer**) to reveal the back with a flip animation.
 - After revealing:
-  - **Got it** marks the card learned and advances
+  - **Next** marks the card learned and advances (becomes **Finish section** on the final card)
   - **Review again** queues it for another pass
 - The section view includes a study header with section/card progress.
 - Card height stays stable between cards, with internal scrolling for longer content and a compact stats row for current/remaining/progress.
@@ -89,6 +89,7 @@ Briefly requires an OpenAI API key to generate content.
 - Open **Settings** (gear icon)
 - Tap **Manage** under *OpenAI API Key*
 - Paste the key and save
+- App version/build is shown subtly in **Settings → About**
 
 **Storage:** the API key is stored securely in the iOS **Keychain**.
 
