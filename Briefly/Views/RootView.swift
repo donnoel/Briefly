@@ -23,16 +23,28 @@ struct RootView: View {
                         topicTransition: topicTransition
                     )
                 case .deck(let topic, let section):
-                    DeckView(
-                        viewModel: DeckSessionViewModel(
-                            topic: topic,
-                            section: section,
-                            progressStore: ProgressStore.shared,
-                            statusStore: TopicStatusStore.shared
-                        )
-                    )
+                    DeckRouteView(topic: topic, section: section)
                 }
             }
         }
+    }
+}
+
+private struct DeckRouteView: View {
+    @StateObject private var viewModel: DeckSessionViewModel
+
+    init(topic: TopicPack, section: TopicSection) {
+        _viewModel = StateObject(
+            wrappedValue: DeckSessionViewModel(
+                topic: topic,
+                section: section,
+                progressStore: ProgressStore.shared,
+                statusStore: TopicStatusStore.shared
+            )
+        )
+    }
+
+    var body: some View {
+        DeckView(viewModel: viewModel)
     }
 }
