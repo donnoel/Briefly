@@ -252,14 +252,14 @@ final class ContentRepository: ObservableObject {
     }
 
     private func currentLocalSyncState() -> CloudTopicState {
-        CloudTopicState(
+        let canonicalIDByLowercasedID = Dictionary(
+            uniqueKeysWithValues: userPackDTOs.map { ($0.id.lowercased(), $0.id) }
+        )
+        return CloudTopicState(
             userPacks: userPackDTOs,
             orderedTopicIDs: normalizeOrder(
                 orderStore.loadOrder(),
-                validIDs: Set(userPackDTOs.map { $0.id.lowercased() }),
-                canonicalIDByLowercasedID: Dictionary(
-                    uniqueKeysWithValues: userPackDTOs.map { ($0.id.lowercased(), $0.id) }
-                )
+                canonicalIDByLowercasedID: canonicalIDByLowercasedID
             )
         )
     }
@@ -301,10 +301,9 @@ final class ContentRepository: ObservableObject {
 
     private func mergedOrder(preferredOrder: [String], secondaryOrder: [String], packs: [TopicPackDTO]) -> [String] {
         let canonicalIDByLowercasedID = Dictionary(uniqueKeysWithValues: packs.map { ($0.id.lowercased(), $0.id) })
-        let validIDs = Set(canonicalIDByLowercasedID.keys)
-        let normalizedPreferred = normalizeOrder(preferredOrder, validIDs: validIDs, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
-        let normalizedSecondary = normalizeOrder(secondaryOrder, validIDs: validIDs, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
-        let fallback = normalizeOrder(packs.map(\.id), validIDs: validIDs, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
+        let normalizedPreferred = normalizeOrder(preferredOrder, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
+        let normalizedSecondary = normalizeOrder(secondaryOrder, canonicalIDByLowercasedID: canonicalIDByLowercasedID)
+        let fallback = normalizeOrder(packs.map(\.id), canonicalIDByLowercasedID: canonicalIDByLowercasedID)
 
         var merged: [String] = []
         var seen = Set<String>()
@@ -319,14 +318,15 @@ final class ContentRepository: ObservableObject {
 
     private func normalizeOrder(
         _ order: [String],
-        validIDs: Set<String>,
         canonicalIDByLowercasedID: [String: String]
     ) -> [String] {
         var normalized: [String] = []
+        normalized.reserveCapacity(order.count)
         var seen = Set<String>()
+        seen.reserveCapacity(order.count)
         for id in order {
             let key = id.lowercased()
-            guard validIDs.contains(key), !seen.contains(key), let canonicalID = canonicalIDByLowercasedID[key] else {
+            guard !seen.contains(key), let canonicalID = canonicalIDByLowercasedID[key] else {
                 continue
             }
             seen.insert(key)
@@ -341,15 +341,31 @@ final class ContentRepository: ObservableObject {
 
     private func deduplicatedDTOs(seed: [TopicPackDTO], user: [TopicPackDTO]) -> [TopicPackDTO] {
         // Merge by id first (user wins), then remove title duplicates (user title wins).
-        let seedFiltered = filteredForDeletion(seed)
-        let userFiltered = filteredForDeletion(user)
+        var seedFiltered: [TopicPackDTO] = []
+        seedFiltered.reserveCapacity(seed.count)
+        for dto in seed where !statusStore.isDeleted(dto.id) {
+            seedFiltered.append(dto)
+        }
+
+        var userFiltered: [TopicPackDTO] = []
+        userFiltered.reserveCapacity(user.count)
+        for dto in user where !statusStore.isDeleted(dto.id) {
+            userFiltered.append(dto)
+        }
 
         var resolvedByID: [String: TopicPackDTO] = [:]
-        seedFiltered.forEach { resolvedByID[$0.id.lowercased()] = $0 }
-        userFiltered.forEach { resolvedByID[$0.id.lowercased()] = $0 }
+        resolvedByID.reserveCapacity(seedFiltered.count + userFiltered.count)
+        for dto in seedFiltered {
+            resolvedByID[dto.id.lowercased()] = dto
+        }
+        for dto in userFiltered {
+            resolvedByID[dto.id.lowercased()] = dto
+        }
 
         var orderedByID: [TopicPackDTO] = []
+        orderedByID.reserveCapacity(seedFiltered.count + userFiltered.count)
         var seenIDs = Set<String>()
+        seenIDs.reserveCapacity(seedFiltered.count + userFiltered.count)
         for dto in userFiltered + seedFiltered {
             let idKey = dto.id.lowercased()
             guard !seenIDs.contains(idKey), let resolved = resolvedByID[idKey] else { continue }
@@ -358,7 +374,9 @@ final class ContentRepository: ObservableObject {
         }
 
         var merged: [TopicPackDTO] = []
+        merged.reserveCapacity(orderedByID.count)
         var seenTitles = Set<String>()
+        seenTitles.reserveCapacity(orderedByID.count)
         for dto in orderedByID {
             let titleKey = dto.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard !seenTitles.contains(titleKey) else { continue }

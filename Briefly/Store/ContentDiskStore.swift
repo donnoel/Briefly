@@ -11,6 +11,12 @@ actor ContentDiskStore: ContentDiskStoring {
     private let fileManager: FileManager = .default
     private let userFilename = "user_content.json"
     private let seedResourceName = "seed_content"
+    private let decoder = JSONDecoder()
+    private let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }()
 
     enum DiskError: LocalizedError {
         case readFailed(Error)
@@ -62,8 +68,6 @@ actor ContentDiskStore: ContentDiskStoring {
     func saveUserPacks(_ packs: [TopicPackDTO]) async throws {
         guard let url = userContentURL() else { throw DiskError.userDirectoryUnavailable }
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(packs)
 
             let directory = url.deletingLastPathComponent()
@@ -77,8 +81,7 @@ actor ContentDiskStore: ContentDiskStoring {
     // MARK: - Helpers
 
     private func decodePacks(from url: URL) throws -> [TopicPackDTO] {
-        let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
         return try decoder.decode([TopicPackDTO].self, from: data)
     }
 
@@ -89,34 +92,32 @@ actor ContentDiskStore: ContentDiskStoring {
         return documents.appendingPathComponent(userFilename)
     }
 
-    private static var uiTestSeedPacks: [TopicPackDTO] {
-        [
-            TopicPackDTO(
-                id: "ui_test_topic_1",
-                title: "UI Test Topic",
-                subtitle: "Seeded topic for deterministic UI performance tests.",
-                category: "General",
-                difficulty: "Beginner",
-                language: "en",
-                description: nil,
-                author: nil,
-                version: "1",
-                sections: [
-                    TopicSectionDTO(
-                        id: "ui_test_section_1",
-                        title: "Section 1",
-                        cards: [
-                            CardDTO(
-                                id: "ui_test_card_1",
-                                front: "Question?",
-                                back: "Answer.",
-                                source: nil,
-                                tags: nil
-                            )
-                        ]
-                    )
-                ]
-            )
-        ]
-    }
+    nonisolated private static let uiTestSeedPacks: [TopicPackDTO] = [
+        TopicPackDTO(
+            id: "ui_test_topic_1",
+            title: "UI Test Topic",
+            subtitle: "Seeded topic for deterministic UI performance tests.",
+            category: "General",
+            difficulty: "Beginner",
+            language: "en",
+            description: nil,
+            author: nil,
+            version: "1",
+            sections: [
+                TopicSectionDTO(
+                    id: "ui_test_section_1",
+                    title: "Section 1",
+                    cards: [
+                        CardDTO(
+                            id: "ui_test_card_1",
+                            front: "Question?",
+                            back: "Answer.",
+                            source: nil,
+                            tags: nil
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
 }
