@@ -8,7 +8,7 @@ protocol ContentDiskStoring: Sendable {
 
 /// Reads/writes topic packs to disk so AI-generated or edited content can persist.
 actor ContentDiskStore: ContentDiskStoring {
-    private let fileManager: FileManager
+    private let fileManager: FileManager = .default
     private let userFilename = "user_content.json"
     private let seedResourceName = "seed_content"
 
@@ -27,10 +27,6 @@ actor ContentDiskStore: ContentDiskStoring {
                 return "Failed to save your topics: \(error.localizedDescription)"
             }
         }
-    }
-
-    init(fileManager: FileManager = .default) {
-        self.fileManager = fileManager
     }
 
     // MARK: - Loading
