@@ -41,22 +41,40 @@ final class BrieflyUITests: XCTestCase {
 
     @MainActor
     func testStudyFlowPerformance() throws {
-        let app = XCUIApplication()
-        app.launchArguments += ["-uiTestSeedTopic"]
-        app.launch()
+        let app = makePerfApp()
+        assertSeededTopicExists(in: app)
 
-        let topicCard = app.descendants(matching: .any)["library.topic.card"].firstMatch
-        guard topicCard.waitForExistence(timeout: 20) else {
-            throw XCTSkip("No topic cards available for study-flow performance test.")
-        }
-        app.terminate()
-
-        let options = XCTMeasureOptions()
-        options.iterationCount = 5
-
+        let options = perfMeasureOptions()
         measure(metrics: [XCTClockMetric()], options: options) {
             app.launch()
             runStudyFlow(in: app)
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    func testLibraryToTopicNavigationPerformance() throws {
+        let app = makePerfApp()
+        assertSeededTopicExists(in: app)
+
+        let options = perfMeasureOptions()
+        measure(metrics: [XCTClockMetric()], options: options) {
+            app.launch()
+            openFirstTopic(in: app)
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    func testTopicToDeckNavigationPerformance() throws {
+        let app = makePerfApp()
+        assertSeededTopicExists(in: app)
+
+        let options = perfMeasureOptions()
+        measure(metrics: [XCTClockMetric()], options: options) {
+            app.launch()
+            openFirstTopic(in: app)
+            openFirstSectionInTopic(in: app)
             app.terminate()
         }
     }
@@ -66,16 +84,45 @@ final class BrieflyUITests: XCTestCase {
         app.swipeUp()
         app.swipeDown()
 
-        let topicCard = app.descendants(matching: .any)["library.topic.card"].firstMatch
-        XCTAssertTrue(topicCard.waitForExistence(timeout: 20), "Expected at least one topic card in library.")
-        topicCard.tap()
-
-        let sectionCard = app.descendants(matching: .any)["topic.section.card"].firstMatch
-        XCTAssertTrue(sectionCard.waitForExistence(timeout: 10), "Expected at least one section card in topic detail.")
-        sectionCard.tap()
+        openFirstTopic(in: app)
+        openFirstSectionInTopic(in: app)
 
         let seeAnswerButton = app.buttons["See answer"].firstMatch
         XCTAssertTrue(seeAnswerButton.waitForExistence(timeout: 5), "Expected deck screen to appear.")
         seeAnswerButton.tap()
+    }
+
+    @MainActor
+    private func openFirstTopic(in app: XCUIApplication) {
+        let topicCard = app.descendants(matching: .any)["library.topic.card"].firstMatch
+        XCTAssertTrue(topicCard.waitForExistence(timeout: 20), "Expected at least one topic card in library.")
+        topicCard.tap()
+    }
+
+    @MainActor
+    private func openFirstSectionInTopic(in app: XCUIApplication) {
+        let sectionCard = app.descendants(matching: .any)["topic.section.card"].firstMatch
+        XCTAssertTrue(sectionCard.waitForExistence(timeout: 10), "Expected at least one section card in topic detail.")
+        sectionCard.tap()
+    }
+
+    @MainActor
+    private func assertSeededTopicExists(in app: XCUIApplication) {
+        app.launch()
+        let topicCard = app.descendants(matching: .any)["library.topic.card"].firstMatch
+        XCTAssertTrue(topicCard.waitForExistence(timeout: 20), "Expected a seeded topic card for UI performance tests.")
+        app.terminate()
+    }
+
+    private func makePerfApp() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestSeedTopic"]
+        return app
+    }
+
+    private func perfMeasureOptions() -> XCTMeasureOptions {
+        let options = XCTMeasureOptions()
+        options.iterationCount = 5
+        return options
     }
 }
