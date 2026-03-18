@@ -120,7 +120,7 @@ struct AIGenerationSheet: View {
                         viewModel: GeneratedPackReviewViewModel(pack: dto),
                         onSave: { editedDTO in
                             do {
-                                if let model = try ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
+                                if let model = try await ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
                                     onSave(model)
                                     isPresented = false
                                     return true

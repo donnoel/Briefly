@@ -3,8 +3,9 @@ import SwiftUI
 struct GeneratedPackReviewView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: GeneratedPackReviewViewModel
-    let onSave: (TopicPackDTO) -> Bool
+    let onSave: (TopicPackDTO) async -> Bool
     let originalDTO: TopicPackDTO
+    @State private var isSaving = false
 
     var body: some View {
         Form {
@@ -46,11 +47,17 @@ struct GeneratedPackReviewView: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    let didSave = onSave(viewModel.toDTO(original: originalDTO))
-                    if didSave {
-                        dismiss()
+                    guard !isSaving else { return }
+                    isSaving = true
+                    Task {
+                        let didSave = await onSave(viewModel.toDTO(original: originalDTO))
+                        isSaving = false
+                        if didSave {
+                            dismiss()
+                        }
                     }
                 }
+                .disabled(isSaving)
             }
         }
     }

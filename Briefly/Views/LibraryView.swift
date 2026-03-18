@@ -205,11 +205,13 @@ struct LibraryView: View {
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
-                withAnimation {
+                Task {
                     do {
-                        try viewModel.delete(topic)
+                        try await viewModel.delete(topic)
                     } catch {
-                        libraryError = error.localizedDescription
+                        await MainActor.run {
+                            libraryError = error.localizedDescription
+                        }
                     }
                 }
             } label: {

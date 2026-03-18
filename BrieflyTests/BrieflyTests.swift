@@ -6,14 +6,14 @@ import Testing
 struct ContentRepositoryTests {
 
     @Test
-    func mergePrefersUserPackWhenIDsMatch() {
+    func mergePrefersUserPackWhenIDsMatch() async {
         let defaults = makeIsolatedDefaults()
         let disk = InMemoryDiskStore(
             seed: [makeDTO(id: "shared_id", title: "Seed Title", subtitle: "Seed subtitle")],
             user: [makeDTO(id: "shared_id", title: "User Title", subtitle: "User subtitle")]
         )
 
-        let repo = makeRepository(disk: disk, defaults: defaults)
+        let repo = await makeRepository(disk: disk, defaults: defaults)
 
         #expect(repo.topics.count == 1)
         #expect(repo.topics.first?.id == "shared_id")
@@ -22,40 +22,40 @@ struct ContentRepositoryTests {
     }
 
     @Test
-    func mergePrefersUserPackWhenTitlesMatch() {
+    func mergePrefersUserPackWhenTitlesMatch() async {
         let defaults = makeIsolatedDefaults()
         let disk = InMemoryDiskStore(
             seed: [makeDTO(id: "seed_alpha", title: "Duplicate Title")],
             user: [makeDTO(id: "user_alpha", title: "duplicate title")]
         )
 
-        let repo = makeRepository(disk: disk, defaults: defaults)
+        let repo = await makeRepository(disk: disk, defaults: defaults)
 
         #expect(repo.topics.count == 1)
         #expect(repo.topics.first?.id == "user_alpha")
     }
 
     @Test
-    func deleteThenReaddSameIDPersistsAfterRelaunch() throws {
+    func deleteThenReaddSameIDPersistsAfterRelaunch() async throws {
         let defaults = makeIsolatedDefaults()
         let pack = makeDTO(id: "topic_readd", title: "Readd Topic")
         let disk = InMemoryDiskStore(seed: [], user: [pack])
 
-        let firstLaunch = makeRepository(disk: disk, defaults: defaults)
+        let firstLaunch = await makeRepository(disk: disk, defaults: defaults)
         let topic = try #require(firstLaunch.topics.first)
 
-        try firstLaunch.deleteTopic(topic)
+        try await firstLaunch.deleteTopic(topic)
         #expect(firstLaunch.topics.isEmpty)
 
-        _ = try firstLaunch.appendOrReplaceUserPack(pack)
+        _ = try await firstLaunch.appendOrReplaceUserPack(pack)
         #expect(firstLaunch.topics.contains(where: { $0.id == "topic_readd" }))
 
-        let secondLaunch = makeRepository(disk: disk, defaults: defaults)
+        let secondLaunch = await makeRepository(disk: disk, defaults: defaults)
         #expect(secondLaunch.topics.map(\.id) == ["topic_readd"])
     }
 
     @Test
-    func deleteKeepsSavedActiveOrderStable() throws {
+    func deleteKeepsSavedActiveOrderStable() async throws {
         let defaults = makeIsolatedDefaults()
         let a = makeDTO(id: "alpha", title: "Alpha")
         let b = makeDTO(id: "beta", title: "Beta")
@@ -67,27 +67,28 @@ struct ContentRepositoryTests {
 
         let statusStore = TopicStatusStore(defaults: defaults)
         let repo = ContentRepository(diskStore: disk, statusStore: statusStore, orderStore: orderStore)
+        await repo.awaitInitialLoad()
 
         #expect(repo.topics.map(\.id) == ["beta", "alpha", "gamma"])
 
         let alphaTopic = try #require(repo.topics.first(where: { $0.id == "alpha" }))
-        try repo.deleteTopic(alphaTopic)
+        try await repo.deleteTopic(alphaTopic)
 
         #expect(repo.topics.map(\.id) == ["beta", "gamma"])
         #expect(orderStore.loadOrder() == ["beta", "gamma"])
 
-        let relaunch = makeRepository(disk: disk, defaults: defaults)
+        let relaunch = await makeRepository(disk: disk, defaults: defaults)
         #expect(relaunch.topics.map(\.id) == ["beta", "gamma"])
     }
 
     @Test
-    func loadFailureBlocksMutationsInsteadOfOverwritingUserData() {
+    func loadFailureBlocksMutationsInsteadOfOverwritingUserData() async {
         let defaults = makeIsolatedDefaults()
         let disk = InMemoryDiskStore(seed: [], user: [], loadUserError: ContentDiskStore.DiskError.readFailed(URLError(.cannotDecodeRawData)))
-        let repo = makeRepository(disk: disk, defaults: defaults)
+        let repo = await makeRepository(disk: disk, defaults: defaults)
 
         do {
-            _ = try repo.appendOrReplaceUserPack(makeDTO(id: "new_topic", title: "New Topic"))
+            _ = try await repo.appendOrReplaceUserPack(makeDTO(id: "new_topic", title: "New Topic"))
             #expect(Bool(false))
             return
         } catch let error as ContentRepository.RepositoryError {
@@ -100,19 +101,19 @@ struct ContentRepositoryTests {
             return
         }
 
-        #expect(disk.saveCallCount == 0)
+        #expect(await disk.saveCallCount == 0)
         #expect(repo.topics.isEmpty)
     }
 
     @Test
-    func deleteThenReaddSameIDResetsCompletionAndProgress() throws {
+    func deleteThenReaddSameIDResetsCompletionAndProgress() async throws {
         let defaults = makeIsolatedDefaults()
         let progressDefaults = makeIsolatedDefaults()
         let progressStore = ProgressStore(defaults: progressDefaults)
         let pack = makeDTO(id: "topic_reset", title: "Reset Topic")
         let disk = InMemoryDiskStore(seed: [], user: [pack])
 
-        let firstLaunch = makeRepository(disk: disk, defaults: defaults, progressStore: progressStore)
+        let firstLaunch = await makeRepository(disk: disk, defaults: defaults, progressStore: progressStore)
         let topic = try #require(firstLaunch.topics.first)
         let section = try #require(topic.sections.first)
         let card = try #require(section.cards.first)
@@ -121,17 +122,17 @@ struct ContentRepositoryTests {
         progressStore.markSectionCompleted(section)
         firstLaunch.toggleCompleted(topic)
 
-        try firstLaunch.deleteTopic(topic)
+        try await firstLaunch.deleteTopic(topic)
 
         #expect(progressStore.progress(for: topic) == 0)
         #expect(!firstLaunch.isCompleted(topic))
 
-        let readdedCandidate = try firstLaunch.appendOrReplaceUserPack(pack)
+        let readdedCandidate = try await firstLaunch.appendOrReplaceUserPack(pack)
         let readded = try #require(readdedCandidate)
         #expect(progressStore.progress(for: readded) == 0)
         #expect(!firstLaunch.isCompleted(readded))
 
-        let secondLaunch = makeRepository(disk: disk, defaults: defaults, progressStore: ProgressStore(defaults: progressDefaults))
+        let secondLaunch = await makeRepository(disk: disk, defaults: defaults, progressStore: ProgressStore(defaults: progressDefaults))
         let relaunchedTopic = try #require(secondLaunch.topics.first)
         #expect(!secondLaunch.isCompleted(relaunchedTopic))
     }
@@ -158,6 +159,7 @@ struct ContentRepositoryTests {
             progressStore: progressStore,
             cloudSyncService: NoopCloudSyncService()
         )
+        await repository.awaitInitialLoad()
         let recentStore = RecentTopicsStore(defaults: recentDefaults)
         let viewModel = LibraryViewModel(
             contentRepository: repository,
@@ -200,6 +202,7 @@ struct ContentRepositoryTests {
             progressStore: progressStore,
             cloudSyncService: NoopCloudSyncService()
         )
+        await repository.awaitInitialLoad()
         let recentStore = RecentTopicsStore(defaults: recentDefaults)
         let viewModel = LibraryViewModel(
             contentRepository: repository,
@@ -228,15 +231,17 @@ struct ContentRepositoryTests {
         disk: InMemoryDiskStore,
         defaults: UserDefaults,
         progressStore: ProgressStore? = nil
-    ) -> ContentRepository {
+    ) async -> ContentRepository {
         let statusStore = TopicStatusStore(defaults: defaults)
         let orderStore = TopicOrderStore(defaults: defaults)
-        return ContentRepository(
+        let repository = ContentRepository(
             diskStore: disk,
             statusStore: statusStore,
             orderStore: orderStore,
             progressStore: progressStore ?? .shared
         )
+        await repository.awaitInitialLoad()
+        return repository
     }
 
     private func makeIsolatedDefaults() -> UserDefaults {
@@ -284,7 +289,7 @@ struct ContentRepositoryTests {
     }
 }
 
-private final class InMemoryDiskStore: ContentDiskStoring {
+private actor InMemoryDiskStore: ContentDiskStoring {
     private let seed: [TopicPackDTO]
     private(set) var user: [TopicPackDTO]
     private let loadUserError: Error?
@@ -296,18 +301,18 @@ private final class InMemoryDiskStore: ContentDiskStoring {
         self.loadUserError = loadUserError
     }
 
-    func loadSeedPacks() -> [TopicPackDTO] {
+    func loadSeedPacks() async -> [TopicPackDTO] {
         seed
     }
 
-    func loadUserPacks() throws -> [TopicPackDTO] {
+    func loadUserPacks() async throws -> [TopicPackDTO] {
         if let loadUserError {
             throw loadUserError
         }
         return user
     }
 
-    func saveUserPacks(_ packs: [TopicPackDTO]) throws {
+    func saveUserPacks(_ packs: [TopicPackDTO]) async throws {
         saveCallCount += 1
         user = packs
     }

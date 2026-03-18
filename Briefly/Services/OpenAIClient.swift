@@ -101,15 +101,13 @@ final class OpenAIClient {
                     try await Task.sleep(nanoseconds: retryDelayNanoseconds(for: attempt))
                     return try await performWithRetry(request: request, attempt: attempt + 1)
                 }
-                print("OpenAI error \(http.statusCode): \(body)")
                 throw ClientError.badResponse(status: http.statusCode, body: body)
             }
 
             return try JSONDecoder().decode(OpenAIChatResponse.self, from: data)
         } catch let clientError as ClientError {
             throw clientError
-        } catch let decodingError as DecodingError {
-            print("OpenAI decode error: \(decodingError)")
+        } catch is DecodingError {
             throw ClientError.decodingFailed
         } catch let urlError as URLError where urlError.code == .timedOut {
             throw ClientError.requestTimedOut

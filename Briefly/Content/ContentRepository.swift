@@ -27,6 +27,7 @@ final class ContentRepository: ObservableObject {
     private let progressStore: ProgressStore
     private let cloudSyncService: (any CloudTopicSyncing)?
     private var userPackLoadFailure: Error?
+    private var initialLoadTask: Task<Void, Never>?
     private var cloudSyncTask: Task<Void, Never>?
     private var cloudDebouncedSyncTask: Task<Void, Never>?
 
@@ -47,16 +48,22 @@ final class ContentRepository: ObservableObject {
         self.orderStore = orderStore ?? .shared
         self.progressStore = progressStore ?? .shared
         self.cloudSyncService = cloudSyncService ?? CloudTopicSyncService.shared
-        loadContent()
-        refreshFromCloud()
+        initialLoadTask = Task { @MainActor in
+            await performInitialLoad()
+            refreshFromCloud()
+        }
     }
 
     // MARK: - Loading
 
-    private func loadContent() {
-        seedPackDTOs = diskStore.loadSeedPacks()
+    func awaitInitialLoad() async {
+        await initialLoadTask?.value
+    }
+
+    private func performInitialLoad() async {
+        seedPackDTOs = await diskStore.loadSeedPacks()
         do {
-            userPackDTOs = try diskStore.loadUserPacks()
+            userPackDTOs = try await diskStore.loadUserPacks()
             userPackLoadFailure = nil
         } catch {
             userPackDTOs = []
@@ -68,7 +75,8 @@ final class ContentRepository: ObservableObject {
     // MARK: - Mutation
 
     @discardableResult
-    func appendOrReplaceUserPack(_ pack: TopicPackDTO) throws -> TopicPack? {
+    func appendOrReplaceUserPack(_ pack: TopicPackDTO) async throws -> TopicPack? {
+        await awaitInitialLoad()
         guard pack.isValid() else { return nil }
         try ensureUserContentIsWritable()
         let wasDeleted = statusStore.isDeleted(pack.id)
@@ -88,7 +96,7 @@ final class ContentRepository: ObservableObject {
         }
 
         do {
-            try diskStore.saveUserPacks(userPackDTOs)
+            try await diskStore.saveUserPacks(userPackDTOs)
         } catch {
             userPackDTOs = originalUserPacks
             if wasDeleted {
@@ -121,14 +129,15 @@ final class ContentRepository: ObservableObject {
         return pack.toModel()
     }
 
-    func deleteTopic(_ topic: TopicPack) throws {
+    func deleteTopic(_ topic: TopicPack) async throws {
+        await awaitInitialLoad()
         let originalUserPacks = userPackDTOs
         // Remove from user packs if present
         if let index = userPackDTOs.firstIndex(where: { $0.id == topic.id }) {
             try ensureUserContentIsWritable()
             userPackDTOs.remove(at: index)
             do {
-                try diskStore.saveUserPacks(userPackDTOs)
+                try await diskStore.saveUserPacks(userPackDTOs)
             } catch {
                 userPackDTOs = originalUserPacks
                 throw error
@@ -172,6 +181,7 @@ final class ContentRepository: ObservableObject {
         guard let cloudSyncService else { return }
         cloudSyncTask?.cancel()
         cloudSyncTask = Task { @MainActor in
+            await awaitInitialLoad()
             await performCloudSync(using: cloudSyncService, trigger: .remoteNotification)
         }
     }
@@ -215,7 +225,7 @@ final class ContentRepository: ObservableObject {
                 )
                 if mergedState.userPacks != localState.userPacks || mergedState.orderedTopicIDs != localState.orderedTopicIDs {
                     do {
-                        try diskStore.saveUserPacks(mergedState.userPacks)
+                        try await diskStore.saveUserPacks(mergedState.userPacks)
                         userPackDTOs = mergedState.userPacks
                         userPackLoadFailure = nil
                         orderStore.saveOrder(for: mergedState.orderedTopicIDs)

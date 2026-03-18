@@ -1,13 +1,13 @@
 import Foundation
 
-protocol ContentDiskStoring {
-    func loadSeedPacks() -> [TopicPackDTO]
-    func loadUserPacks() throws -> [TopicPackDTO]
-    func saveUserPacks(_ packs: [TopicPackDTO]) throws
+protocol ContentDiskStoring: Sendable {
+    func loadSeedPacks() async -> [TopicPackDTO]
+    func loadUserPacks() async throws -> [TopicPackDTO]
+    func saveUserPacks(_ packs: [TopicPackDTO]) async throws
 }
 
 /// Reads/writes topic packs to disk so AI-generated or edited content can persist.
-final class ContentDiskStore: ContentDiskStoring {
+actor ContentDiskStore: ContentDiskStoring {
     private let fileManager: FileManager
     private let userFilename = "user_content.json"
     private let seedResourceName = "seed_content"
@@ -35,7 +35,7 @@ final class ContentDiskStore: ContentDiskStoring {
 
     // MARK: - Loading
 
-    func loadSeedPacks() -> [TopicPackDTO] {
+    func loadSeedPacks() async -> [TopicPackDTO] {
         guard let url = Bundle.main.url(forResource: seedResourceName, withExtension: "json") else {
             return []
         }
@@ -47,7 +47,7 @@ final class ContentDiskStore: ContentDiskStoring {
         }
     }
 
-    func loadUserPacks() throws -> [TopicPackDTO] {
+    func loadUserPacks() async throws -> [TopicPackDTO] {
         guard let url = userContentURL() else { return [] }
         guard fileManager.fileExists(atPath: url.path) else { return [] }
         do {
@@ -59,7 +59,7 @@ final class ContentDiskStore: ContentDiskStoring {
 
     // MARK: - Saving
 
-    func saveUserPacks(_ packs: [TopicPackDTO]) throws {
+    func saveUserPacks(_ packs: [TopicPackDTO]) async throws {
         guard let url = userContentURL() else { throw DiskError.userDirectoryUnavailable }
         do {
             let encoder = JSONEncoder()

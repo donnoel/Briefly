@@ -118,8 +118,8 @@ final class LibraryViewModel: ObservableObject {
         recentTopicsStore.recordOpened(topicID: topic.id)
     }
 
-    func delete(_ topic: TopicPack) throws {
-        try contentRepository.deleteTopic(topic)
+    func delete(_ topic: TopicPack) async throws {
+        try await contentRepository.deleteTopic(topic)
     }
 
     func toggleCompleted(_ topic: TopicPack) {
@@ -230,9 +230,7 @@ final class LibraryViewModel: ObservableObject {
             normalizedBase = mergeSections(into: normalizedBase, additionalSections: normalizedSecond.sections)
         }
 
-        return try await MainActor.run {
-            try self.contentRepository.appendOrReplaceUserPack(normalizedBase)
-        }
+        return try await contentRepository.appendOrReplaceUserPack(normalizedBase)
     }
 
     enum RandomTopicError: LocalizedError {
