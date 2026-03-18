@@ -23,7 +23,10 @@ final class LibraryViewModel: ObservableObject {
     }
 
     @Published private(set) var topics: [TopicPack] = [] {
-        didSet { recomputeDerivedState() }
+        didSet {
+            recomputeProgressCache()
+            recomputeDerivedState()
+        }
     }
     @Published var searchText: String = "" {
         didSet { recomputeDerivedState() }
@@ -41,6 +44,7 @@ final class LibraryViewModel: ObservableObject {
     private let statusStore: TopicStatusStore
     private let recentTopicsStore: RecentTopicsStore
     private var cancellables = Set<AnyCancellable>()
+    private var cachedProgressByTopicID: [String: Double] = [:]
 
     init(
         contentRepository: ContentRepository,
@@ -71,6 +75,7 @@ final class LibraryViewModel: ObservableObject {
         self.progressStore.$learnedCardIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
+                self?.recomputeProgressCache()
                 self?.recomputeDerivedState()
             }
             .store(in: &cancellables)
@@ -78,6 +83,7 @@ final class LibraryViewModel: ObservableObject {
         self.progressStore.$completedSectionIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
+                self?.recomputeProgressCache()
                 self?.recomputeDerivedState()
             }
             .store(in: &cancellables)
@@ -89,11 +95,12 @@ final class LibraryViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        recomputeProgressCache()
         recomputeDerivedState()
     }
 
     func progress(for topic: TopicPack) -> Double {
-        derivedState.progressByTopicID[topic.id] ?? progressStore.progress(for: topic)
+        cachedProgressByTopicID[topic.id] ?? progressStore.progress(for: topic)
     }
 
     func refresh() {
@@ -269,11 +276,7 @@ final class LibraryViewModel: ObservableObject {
             }
         }
 
-        var progressByTopicID: [String: Double] = [:]
-        progressByTopicID.reserveCapacity(topics.count)
-        for topic in topics {
-            progressByTopicID[topic.id] = progressStore.progress(for: topic)
-        }
+        let progressByTopicID = cachedProgressByTopicID
 
         let recentIDs = recentTopicsStore.topicIDs
         let recentLowercasedIDs = Set(recentIDs.map { $0.lowercased() })
@@ -329,6 +332,15 @@ final class LibraryViewModel: ObservableObject {
             inProgressTopicCount: inProgressCount,
             progressByTopicID: progressByTopicID
         )
+    }
+
+    private func recomputeProgressCache() {
+        var progressByTopicID: [String: Double] = [:]
+        progressByTopicID.reserveCapacity(topics.count)
+        for topic in topics {
+            progressByTopicID[topic.id] = progressStore.progress(for: topic)
+        }
+        cachedProgressByTopicID = progressByTopicID
     }
 
     private func shouldHighlightForResume(
