@@ -177,13 +177,16 @@ final class ContentRepository: ObservableObject {
         scheduleCloudSync()
     }
 
-    func refreshFromCloud() {
-        guard let cloudSyncService else { return }
+    @discardableResult
+    func refreshFromCloud() -> Task<Void, Never>? {
+        guard let cloudSyncService else { return nil }
         cloudSyncTask?.cancel()
-        cloudSyncTask = Task { @MainActor in
+        let syncTask = Task { @MainActor in
             await awaitInitialLoad()
             await performCloudSync(using: cloudSyncService, trigger: .remoteNotification)
         }
+        cloudSyncTask = syncTask
+        return syncTask
     }
 
     private func ensureUserContentIsWritable() throws {

@@ -25,7 +25,8 @@ final class BrieflyAppDelegate: NSObject, UIApplicationDelegate {
         }
 
         Task { @MainActor in
-            ContentRepository.shared.refreshFromCloud()
+            let syncTask = ContentRepository.shared.refreshFromCloud()
+            await syncTask?.value
             completionHandler(.newData)
         }
     }

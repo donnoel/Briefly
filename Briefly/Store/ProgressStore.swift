@@ -41,11 +41,20 @@ final class ProgressStore: ObservableObject {
     }
 
     func progress(for topic: TopicPack) -> Double {
-        let allCards = topic.sections.flatMap(\.cards)
-        guard !allCards.isEmpty else { return 0 }
+        var totalCardCount = 0
+        var learnedCardCount = 0
 
-        let learnedCount = allCards.filter { learnedCardIDs.contains($0.id) }.count
-        return Double(learnedCount) / Double(allCards.count)
+        for section in topic.sections {
+            for card in section.cards {
+                totalCardCount += 1
+                if learnedCardIDs.contains(card.id) {
+                    learnedCardCount += 1
+                }
+            }
+        }
+
+        guard totalCardCount > 0 else { return 0 }
+        return Double(learnedCardCount) / Double(totalCardCount)
     }
 
     func isSectionCompleted(_ section: TopicSection) -> Bool {
@@ -53,11 +62,12 @@ final class ProgressStore: ObservableObject {
     }
 
     func resetProgress(for topic: TopicPack) {
-        let cardIDs = Set(topic.sections.flatMap(\.cards).map(\.id))
-        let sectionIDs = Set(topic.sections.map(\.id))
-
-        learnedCardIDs.subtract(cardIDs)
-        completedSectionIDs.subtract(sectionIDs)
+        for section in topic.sections {
+            completedSectionIDs.remove(section.id)
+            for card in section.cards {
+                learnedCardIDs.remove(card.id)
+            }
+        }
         flushPendingSaves()
     }
 
