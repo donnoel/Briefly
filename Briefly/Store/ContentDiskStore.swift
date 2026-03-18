@@ -32,6 +32,10 @@ actor ContentDiskStore: ContentDiskStoring {
     // MARK: - Loading
 
     func loadSeedPacks() async -> [TopicPackDTO] {
+        if ProcessInfo.processInfo.arguments.contains("-uiTestSeedTopic") {
+            return Self.uiTestSeedPacks
+        }
+
         guard let url = Bundle.main.url(forResource: seedResourceName, withExtension: "json") else {
             return []
         }
@@ -83,5 +87,36 @@ actor ContentDiskStore: ContentDiskStoring {
             return nil
         }
         return documents.appendingPathComponent(userFilename)
+    }
+
+    private static var uiTestSeedPacks: [TopicPackDTO] {
+        [
+            TopicPackDTO(
+                id: "ui_test_topic_1",
+                title: "UI Test Topic",
+                subtitle: "Seeded topic for deterministic UI performance tests.",
+                category: "General",
+                difficulty: "Beginner",
+                language: "en",
+                description: nil,
+                author: nil,
+                version: "1",
+                sections: [
+                    TopicSectionDTO(
+                        id: "ui_test_section_1",
+                        title: "Section 1",
+                        cards: [
+                            CardDTO(
+                                id: "ui_test_card_1",
+                                front: "Question?",
+                                back: "Answer.",
+                                source: nil,
+                                tags: nil
+                            )
+                        ]
+                    )
+                ]
+            )
+        ]
     }
 }

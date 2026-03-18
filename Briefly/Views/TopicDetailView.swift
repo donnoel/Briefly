@@ -296,6 +296,7 @@ struct TopicDetailView: View {
             .background(sectionCardBackground(completed: completed))
         }
         .buttonStyle(InteractiveCardButtonStyle())
+        .accessibilityIdentifier("topic.section.card")
     }
 
     private func sectionCardBackground(completed: Bool) -> some View {

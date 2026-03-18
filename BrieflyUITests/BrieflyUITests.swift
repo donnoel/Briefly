@@ -38,4 +38,44 @@ final class BrieflyUITests: XCTestCase {
             XCUIApplication().launch()
         }
     }
+
+    @MainActor
+    func testStudyFlowPerformance() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestSeedTopic"]
+        app.launch()
+
+        let topicCard = app.descendants(matching: .any)["library.topic.card"].firstMatch
+        guard topicCard.waitForExistence(timeout: 20) else {
+            throw XCTSkip("No topic cards available for study-flow performance test.")
+        }
+        app.terminate()
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 5
+
+        measure(metrics: [XCTClockMetric()], options: options) {
+            app.launch()
+            runStudyFlow(in: app)
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    private func runStudyFlow(in app: XCUIApplication) {
+        app.swipeUp()
+        app.swipeDown()
+
+        let topicCard = app.descendants(matching: .any)["library.topic.card"].firstMatch
+        XCTAssertTrue(topicCard.waitForExistence(timeout: 20), "Expected at least one topic card in library.")
+        topicCard.tap()
+
+        let sectionCard = app.descendants(matching: .any)["topic.section.card"].firstMatch
+        XCTAssertTrue(sectionCard.waitForExistence(timeout: 10), "Expected at least one section card in topic detail.")
+        sectionCard.tap()
+
+        let seeAnswerButton = app.buttons["See answer"].firstMatch
+        XCTAssertTrue(seeAnswerButton.waitForExistence(timeout: 5), "Expected deck screen to appear.")
+        seeAnswerButton.tap()
+    }
 }

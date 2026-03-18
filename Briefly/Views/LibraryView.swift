@@ -513,6 +513,7 @@ struct LibraryView: View {
             }
         }
         .buttonStyle(InteractiveCardButtonStyle())
+        .accessibilityIdentifier("library.topic.card")
     }
 
     private func generateRandomTopic() async {
