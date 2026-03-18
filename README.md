@@ -52,6 +52,7 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 - Your topics still remain available in **Your Order** and **Completed** sections.
 - Active search/filter chips appear near the top and can be cleared individually.
 - If filters/search remove all visible topics, Briefly shows a **No matching topics** state with a **Clear filters** action.
+- On launch, Briefly waits for persisted topic data before showing empty-library prompts so transient “Generate with AI” empty states do not flash.
 - Reorder active topics with drag-and-drop.
 - Swipe:
   - **Leading**: mark complete/incomplete

@@ -175,9 +175,9 @@ struct LibraryView: View {
             }
         }
         .overlay {
-            if !hasAnyTopics {
+            if viewModel.hasCompletedInitialLoad && !hasAnyTopics {
                 emptyState
-            } else if hasActiveFilters && !hasVisibleTopics {
+            } else if viewModel.hasCompletedInitialLoad && hasActiveFilters && !hasVisibleTopics {
                 noResultsState
             }
         }

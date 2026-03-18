@@ -19,6 +19,7 @@ final class ContentRepository: ObservableObject {
     }
 
     @Published private(set) var topics: [TopicPack] = []
+    @Published private(set) var hasCompletedInitialLoad = false
     private let diskStore: any ContentDiskStoring
     private var seedPackDTOs: [TopicPackDTO] = []
     private var userPackDTOs: [TopicPackDTO] = []
@@ -61,6 +62,7 @@ final class ContentRepository: ObservableObject {
     }
 
     private func performInitialLoad() async {
+        hasCompletedInitialLoad = false
         seedPackDTOs = await diskStore.loadSeedPacks()
         do {
             userPackDTOs = try await diskStore.loadUserPacks()
@@ -70,6 +72,7 @@ final class ContentRepository: ObservableObject {
             userPackLoadFailure = error
         }
         rebuildTopicsFromCurrentDTOs()
+        hasCompletedInitialLoad = true
     }
 
     // MARK: - Mutation

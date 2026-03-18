@@ -38,6 +38,7 @@ final class LibraryViewModel: ObservableObject {
         didSet { recomputeDerivedState() }
     }
     @Published private var derivedState = DerivedState()
+    @Published private(set) var hasCompletedInitialLoad: Bool = false
 
     private let contentRepository: ContentRepository
     private let progressStore: ProgressStore
@@ -57,11 +58,19 @@ final class LibraryViewModel: ObservableObject {
         self.statusStore = statusStore ?? .shared
         self.recentTopicsStore = recentTopicsStore ?? .shared
         self.topics = contentRepository.topics
+        self.hasCompletedInitialLoad = contentRepository.hasCompletedInitialLoad
 
         contentRepository.$topics
             .receive(on: DispatchQueue.main)
             .sink { [weak self] updated in
                 self?.topics = updated
+            }
+            .store(in: &cancellables)
+
+        contentRepository.$hasCompletedInitialLoad
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] hasCompleted in
+                self?.hasCompletedInitialLoad = hasCompleted
             }
             .store(in: &cancellables)
 
