@@ -27,6 +27,8 @@ final class ContentRepository: ObservableObject {
     private let orderStore: TopicOrderStore
     private let progressStore: ProgressStore
     private let cloudSyncService: (any CloudTopicSyncing)?
+    private var cancellables = Set<AnyCancellable>()
+    private var isApplyingCloudState = false
     private var userPackLoadFailure: Error?
     private var initialLoadTask: Task<Void, Never>?
     private var cloudSyncTask: Task<Void, Never>?
@@ -49,6 +51,7 @@ final class ContentRepository: ObservableObject {
         self.orderStore = orderStore ?? .shared
         self.progressStore = progressStore ?? .shared
         self.cloudSyncService = cloudSyncService ?? CloudTopicSyncService.shared
+        observeStoreChangesForCloudSync()
         initialLoadTask = Task { @MainActor in
             await performInitialLoad()
             refreshFromCloud()
@@ -229,16 +232,43 @@ final class ContentRepository: ObservableObject {
                     localState: localState,
                     trigger: trigger
                 )
-                if mergedState.userPacks != localState.userPacks || mergedState.orderedTopicIDs != localState.orderedTopicIDs {
+                let shouldApplyContentChanges = mergedState.userPacks != localState.userPacks
+                    || mergedState.orderedTopicIDs != localState.orderedTopicIDs
+                let shouldApplyStatusChanges = mergedState.completedTopicIDs != localState.completedTopicIDs
+                    || mergedState.deletedTopicIDs != localState.deletedTopicIDs
+                let shouldApplyProgressChanges = mergedState.learnedCardIDs != localState.learnedCardIDs
+                    || mergedState.completedSectionIDs != localState.completedSectionIDs
+
+                if shouldApplyContentChanges {
                     do {
                         try await diskStore.saveUserPacks(mergedState.userPacks)
                         userPackDTOs = mergedState.userPacks
                         userPackLoadFailure = nil
                         orderStore.saveOrder(for: mergedState.orderedTopicIDs)
-                        rebuildTopicsFromCurrentDTOs()
                     } catch {
                         return
                     }
+                }
+
+                if shouldApplyStatusChanges || shouldApplyProgressChanges {
+                    isApplyingCloudState = true
+                    if shouldApplyStatusChanges {
+                        statusStore.replace(
+                            completedIDs: mergedState.completedTopicIDs,
+                            deletedIDs: mergedState.deletedTopicIDs
+                        )
+                    }
+                    if shouldApplyProgressChanges {
+                        progressStore.replace(
+                            learnedCardIDs: mergedState.learnedCardIDs,
+                            completedSectionIDs: mergedState.completedSectionIDs
+                        )
+                    }
+                    isApplyingCloudState = false
+                }
+
+                if shouldApplyContentChanges || shouldApplyStatusChanges {
+                    rebuildTopicsFromCurrentDTOs()
                 }
 
                 if remoteState == nil || remoteState != mergedState {
@@ -263,7 +293,11 @@ final class ContentRepository: ObservableObject {
             orderedTopicIDs: normalizeOrder(
                 orderStore.loadOrder(),
                 canonicalIDByLowercasedID: canonicalIDByLowercasedID
-            )
+            ),
+            completedTopicIDs: statusStore.completedIDs,
+            deletedTopicIDs: statusStore.deletedIDs,
+            learnedCardIDs: progressStore.learnedCardIDs,
+            completedSectionIDs: progressStore.completedSectionIDs
         )
     }
 
@@ -274,13 +308,20 @@ final class ContentRepository: ObservableObject {
     ) -> CloudTopicState {
         guard let remoteState else {
             let mergedPacks = deduplicatedDTOs(seed: [], user: localState.userPacks)
+            let validTopicIDs = Set(mergedPacks.map { $0.id.lowercased() })
+            let validCardIDs = Set(mergedPacks.flatMap { $0.sections }.flatMap { $0.cards }.map { $0.id.lowercased() })
+            let validSectionIDs = Set(mergedPacks.flatMap { $0.sections }.map { $0.id.lowercased() })
             return CloudTopicState(
                 userPacks: mergedPacks,
                 orderedTopicIDs: mergedOrder(
                     preferredOrder: localState.orderedTopicIDs,
                     secondaryOrder: [],
                     packs: mergedPacks
-                )
+                ),
+                completedTopicIDs: filteredSet(localState.completedTopicIDs, keeping: validTopicIDs),
+                deletedTopicIDs: filteredSet(localState.deletedTopicIDs, keeping: validTopicIDs),
+                learnedCardIDs: filteredSet(localState.learnedCardIDs, keeping: validCardIDs),
+                completedSectionIDs: filteredSet(localState.completedSectionIDs, keeping: validSectionIDs)
             )
         }
 
@@ -296,10 +337,53 @@ final class ContentRepository: ObservableObject {
             secondaryOrder = localState.orderedTopicIDs
         }
 
+        let validTopicIDs = Set(mergedPacks.map { $0.id.lowercased() })
+        let validCardIDs = Set(mergedPacks.flatMap { $0.sections }.flatMap { $0.cards }.map { $0.id.lowercased() })
+        let validSectionIDs = Set(mergedPacks.flatMap { $0.sections }.map { $0.id.lowercased() })
+        let preferredCompleted = trigger == .localMutation ? localState.completedTopicIDs : remoteState.completedTopicIDs
+        let preferredDeleted = trigger == .localMutation ? localState.deletedTopicIDs : remoteState.deletedTopicIDs
+        let preferredLearned = trigger == .localMutation ? localState.learnedCardIDs : remoteState.learnedCardIDs
+        let preferredCompletedSections = trigger == .localMutation ? localState.completedSectionIDs : remoteState.completedSectionIDs
+
         return CloudTopicState(
             userPacks: mergedPacks,
-            orderedTopicIDs: mergedOrder(preferredOrder: preferredOrder, secondaryOrder: secondaryOrder, packs: mergedPacks)
+            orderedTopicIDs: mergedOrder(preferredOrder: preferredOrder, secondaryOrder: secondaryOrder, packs: mergedPacks),
+            completedTopicIDs: filteredSet(preferredCompleted, keeping: validTopicIDs),
+            deletedTopicIDs: filteredSet(preferredDeleted, keeping: validTopicIDs),
+            learnedCardIDs: filteredSet(preferredLearned, keeping: validCardIDs),
+            completedSectionIDs: filteredSet(preferredCompletedSections, keeping: validSectionIDs)
         )
+    }
+
+    private func observeStoreChangesForCloudSync() {
+        statusStore.$completedIDs
+            .dropFirst()
+            .sink { [weak self] _ in self?.scheduleCloudSyncForStoreChange() }
+            .store(in: &cancellables)
+
+        statusStore.$deletedIDs
+            .dropFirst()
+            .sink { [weak self] _ in self?.scheduleCloudSyncForStoreChange() }
+            .store(in: &cancellables)
+
+        progressStore.$learnedCardIDs
+            .dropFirst()
+            .sink { [weak self] _ in self?.scheduleCloudSyncForStoreChange() }
+            .store(in: &cancellables)
+
+        progressStore.$completedSectionIDs
+            .dropFirst()
+            .sink { [weak self] _ in self?.scheduleCloudSyncForStoreChange() }
+            .store(in: &cancellables)
+    }
+
+    private func scheduleCloudSyncForStoreChange() {
+        guard hasCompletedInitialLoad, !isApplyingCloudState else { return }
+        scheduleCloudSync()
+    }
+
+    private func filteredSet(_ values: Set<String>, keeping validLowercasedIDs: Set<String>) -> Set<String> {
+        Set(values.filter { validLowercasedIDs.contains($0.lowercased()) })
     }
 
     private func mergedOrder(preferredOrder: [String], secondaryOrder: [String], packs: [TopicPackDTO]) -> [String] {

@@ -54,6 +54,13 @@ final class TopicStatusStore: ObservableObject {
         deletedIDs.contains(id)
     }
 
+    func replace(completedIDs: Set<String>, deletedIDs: Set<String>) {
+        guard self.completedIDs != completedIDs || self.deletedIDs != deletedIDs else { return }
+        self.completedIDs = completedIDs
+        self.deletedIDs = deletedIDs
+        save()
+    }
+
     private func load() {
         if let array = defaults.array(forKey: completedKey) as? [String] {
             completedIDs = Set(array)

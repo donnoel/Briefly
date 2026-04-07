@@ -71,6 +71,13 @@ final class ProgressStore: ObservableObject {
         flushPendingSaves()
     }
 
+    func replace(learnedCardIDs: Set<String>, completedSectionIDs: Set<String>) {
+        guard self.learnedCardIDs != learnedCardIDs || self.completedSectionIDs != completedSectionIDs else { return }
+        self.learnedCardIDs = learnedCardIDs
+        self.completedSectionIDs = completedSectionIDs
+        flushPendingSaves()
+    }
+
     // MARK: - Persistence
 
     private func load() {
