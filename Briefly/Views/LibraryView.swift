@@ -513,6 +513,29 @@ struct LibraryView: View {
             }
         }
         .buttonStyle(InteractiveCardButtonStyle())
+        .contextMenu {
+            Button {
+                withAnimation {
+                    viewModel.toggleCompleted(topic)
+                }
+            } label: {
+                Label(viewModel.isCompleted(topic) ? "Mark Incomplete" : "Mark Complete", systemImage: "checkmark.seal")
+            }
+
+            Button(role: .destructive) {
+                Task {
+                    do {
+                        try await viewModel.delete(topic)
+                    } catch {
+                        await MainActor.run {
+                            libraryError = error.localizedDescription
+                        }
+                    }
+                }
+            } label: {
+                Label("Delete Topic", systemImage: "trash")
+            }
+        }
         .accessibilityIdentifier("library.topic.card")
     }
 

@@ -67,6 +67,7 @@ Success means users can reliably add content, complete deck sessions, and resume
 - Keep flows simple and readable for short study sessions.
 - Topic detail should preserve context with a premium hero summary and clear section-entry affordances, without changing deck behavior.
 - Preserve the library's resume surfaces: continue-learning cards should be powered by existing progress plus lightweight recency state, not new recommendation logic.
+- Keep topic management actions discoverable from all library surfaces (including non-list cards), especially delete and completion toggles.
 - Keep error text plain-language and actionable.
 - Do not add setup friction to core library/deck usage.
 

@@ -227,6 +227,26 @@ struct ContentRepositoryTests {
         #expect(Array(viewModel.continueLearningTopics.prefix(2)).map(\.id) == ["alpha", "beta"])
     }
 
+    @Test
+    func randomTopicTitleFallsBackWhenModelReturnsGenericSurprise() {
+        let title = LibraryViewModel.sanitizedRandomTopicTitle(
+            generatedTitle: "Suprise....",
+            requestedTitle: "Behavioral Economics"
+        )
+
+        #expect(title == "Behavioral Economics")
+    }
+
+    @Test
+    func randomTopicTitleKeepsSpecificModelTitle() {
+        let title = LibraryViewModel.sanitizedRandomTopicTitle(
+            generatedTitle: "Neuroscience Curiosities",
+            requestedTitle: "Behavioral Economics"
+        )
+
+        #expect(title == "Neuroscience Curiosities")
+    }
+
     private func makeRepository(
         disk: InMemoryDiskStore,
         defaults: UserDefaults,

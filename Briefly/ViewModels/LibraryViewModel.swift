@@ -185,12 +185,12 @@ final class LibraryViewModel: ObservableObject {
         // Pick a subject the user doesn't already have. If all are taken, synthesize a new one.
         let subject: String = {
             let unseenSubjects = subjects.filter { !existingTitles.contains($0.lowercased()) }
-            let candidate = unseenSubjects.randomElement() ?? "surprise topic"
-            if existingTitles.contains(candidate.lowercased()) {
-                return "surprise topic \(UUID().uuidString.prefix(6))"
+            if let candidate = unseenSubjects.randomElement() {
+                return candidate
             }
-            return candidate
+            return Self.synthesizedSubject(existingTitles: existingTitles)
         }()
+        let requestedTitle = subject.capitalized
 
         let difficulty = Difficulty.allCases.randomElement() ?? .beginner
 
@@ -205,7 +205,7 @@ final class LibraryViewModel: ObservableObject {
         let secondTarget = max(targetSections - firstTarget, 0)
 
         async let firstCall = service.generateTopicPack(
-            title: subject.capitalized,
+            title: requestedTitle,
             difficulty: difficulty,
             language: "en",
             targetSections: firstTarget,
@@ -213,7 +213,7 @@ final class LibraryViewModel: ObservableObject {
         )
 
         async let secondCall: TopicPackDTO? = secondTarget > 0 ? service.generateTopicPack(
-            title: subject.capitalized,
+            title: requestedTitle,
             difficulty: difficulty,
             language: "en",
             targetSections: secondTarget,
@@ -227,7 +227,11 @@ final class LibraryViewModel: ObservableObject {
         // Choose the final pack ID/title before normalizing IDs to avoid collisions.
         let uniqueBase = makeUnique(dto: firstDTO, existingIDs: existingIDs, existingTitles: existingTitles)
         let baseID = uniqueBase.id
-        let baseTitle = uniqueBase.title
+        let sanitizedTitle = Self.sanitizedRandomTopicTitle(
+            generatedTitle: uniqueBase.title,
+            requestedTitle: requestedTitle
+        )
+        let baseTitle = Self.makeUniqueTitle(base: sanitizedTitle, existingTitles: existingTitles)
 
         var normalizedBase = normalize(
             dto: uniqueBase,
@@ -443,5 +447,52 @@ final class LibraryViewModel: ObservableObject {
             version: dto.version,
             sections: dto.sections + additionalSections
         )
+    }
+
+    static func sanitizedRandomTopicTitle(generatedTitle: String, requestedTitle: String) -> String {
+        let trimmedGenerated = generatedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedGenerated.isEmpty else { return requestedTitle }
+        return isGenericSurpriseTitle(trimmedGenerated) ? requestedTitle : trimmedGenerated
+    }
+
+    private static func makeUniqueTitle(base: String, existingTitles: Set<String>) -> String {
+        var uniqueTitle = base
+        var counter = 1
+        while existingTitles.contains(uniqueTitle.lowercased()) {
+            uniqueTitle = "\(base) (\(counter))"
+            counter += 1
+        }
+        return uniqueTitle
+    }
+
+    private static func isGenericSurpriseTitle(_ title: String) -> Bool {
+        let normalized = title
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return [
+            "surprise",
+            "suprise",
+            "surprise me",
+            "surprise topic",
+            "suprise topic",
+            "random topic"
+        ].contains(normalized)
+    }
+
+    private static func synthesizedSubject(existingTitles: Set<String>) -> String {
+        let adjectives = ["practical", "modern", "curious", "strategic", "creative", "human centered"]
+        let domains = ["decision making", "systems thinking", "digital wellness", "communication patterns", "learning science", "problem framing"]
+
+        for _ in 0..<24 {
+            guard let adjective = adjectives.randomElement(), let domain = domains.randomElement() else { break }
+            let candidate = "\(adjective) \(domain)"
+            if !existingTitles.contains(candidate.lowercased()) {
+                return candidate
+            }
+        }
+
+        let suffix = UUID().uuidString.prefix(6).lowercased()
+        return "practical systems thinking \(suffix)"
     }
 }
