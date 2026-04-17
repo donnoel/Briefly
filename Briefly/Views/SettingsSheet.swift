@@ -58,11 +58,6 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("About") {
-                    Text("v\(appVersion)")
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
             }
             .navigationTitle("Settings")
             .toolbar {
@@ -108,12 +103,6 @@ struct SettingsSheet: View {
                 }
             }
         }
-    }
-
-    private var appVersion: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
-        return "\(version) (\(build))"
     }
 
     private var keyStatusText: String {
