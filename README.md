@@ -90,7 +90,7 @@ Briefly requires an OpenAI API key to generate content.
 - Open **Settings** (gear icon)
 - Tap **Manage** under *OpenAI API Key*
 - Paste the key and save
-- App version/build is shown subtly in **Settings → About**
+- App version/build is also shown in iOS Settings for Briefly under **Version**
 
 **Storage:** the API key is stored securely in the iOS **Keychain**.
 
