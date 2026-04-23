@@ -1,8 +1,11 @@
 import Foundation
 import Combine
+import os
 
 @MainActor
 final class LibraryViewModel: ObservableObject {
+    private static let logger = Logger(subsystem: "dn.Briefly", category: "LibraryViewModel")
+
     struct TopicGroup: Identifiable {
         let title: String
         let topics: [TopicPack]
@@ -191,30 +194,61 @@ final class LibraryViewModel: ObservableObject {
         let difficulty = Difficulty.allCases.randomElement() ?? .beginner
 
         let service = AIContentService(transport: BrieflyBackendClient())
-
-        // Progressive strategy: request sections in two smaller batches concurrently, then merge.
-        let firstTarget = min(targetSections, 3)
-        let secondTarget = max(targetSections - firstTarget, 0)
-
-        async let firstCall = service.generateTopicPack(
-            title: requestedTitle,
-            difficulty: difficulty,
-            language: "en",
-            targetSections: firstTarget,
-            targetCardsPerSection: cardsPerSection
+        Self.logger.debug(
+            "Surprise Me start: requestedTitle=\(requestedTitle, privacy: .public) targetSections=\(targetSections, privacy: .public) cardsPerSection=\(cardsPerSection, privacy: .public)"
         )
 
-        async let secondCall: TopicPackDTO? = secondTarget > 0 ? service.generateTopicPack(
-            title: requestedTitle,
-            difficulty: difficulty,
-            language: "en",
-            targetSections: secondTarget,
-            targetCardsPerSection: cardsPerSection
-        ) : nil
+        // Progressive strategy: request sections in two smaller batches, then merge.
+        let perRequestSectionsCap = AIContentService.RequestSizing.preferredMaxSectionsPerRequest
+        let perRequestCards = AIContentService.RequestSizing.cardsPerSection(for: cardsPerSection)
+        let firstTarget = min(targetSections, perRequestSectionsCap)
+        let secondTarget = max(targetSections - firstTarget, 0)
+        Self.logger.debug(
+            "Surprise Me request plan: firstSections=\(firstTarget, privacy: .public) secondSections=\(secondTarget, privacy: .public) requestedCardsPerSection=\(cardsPerSection, privacy: .public) effectiveCardsPerSection=\(perRequestCards, privacy: .public)"
+        )
 
-        // Await both calls before persisting to ensure all-or-nothing saves.
-        let firstDTO = try await firstCall
-        let secondDTO = try await secondCall
+        Self.logger.debug("Surprise Me first request start")
+        let firstDTO: TopicPackDTO
+        do {
+            firstDTO = try await service.generateTopicPack(
+                title: requestedTitle,
+                difficulty: difficulty,
+                language: "en",
+                targetSections: firstTarget,
+                targetCardsPerSection: perRequestCards
+            )
+            let firstCounts = SurpriseMeAssembly.dtoCounts(firstDTO)
+            Self.logger.debug(
+                "Surprise Me first request complete: sections=\(firstCounts.sections, privacy: .public) cards=\(firstCounts.cards, privacy: .public)"
+            )
+        } catch {
+            logSurpriseMeError(error, stage: "first request")
+            throw error
+        }
+
+        let secondDTO: TopicPackDTO?
+        if secondTarget > 0 {
+            Self.logger.debug("Surprise Me second request start")
+            do {
+                let dto = try await service.generateTopicPack(
+                    title: requestedTitle,
+                    difficulty: difficulty,
+                    language: "en",
+                    targetSections: secondTarget,
+                    targetCardsPerSection: perRequestCards
+                )
+                let secondCounts = SurpriseMeAssembly.dtoCounts(dto)
+                Self.logger.debug(
+                    "Surprise Me second request complete: sections=\(secondCounts.sections, privacy: .public) cards=\(secondCounts.cards, privacy: .public)"
+                )
+                secondDTO = dto
+            } catch {
+                logSurpriseMeError(error, stage: "second request")
+                throw error
+            }
+        } else {
+            secondDTO = nil
+        }
 
         // Choose the final pack ID/title before normalizing IDs to avoid collisions.
         let uniqueBase = makeUnique(dto: firstDTO, existingIDs: existingIDs, existingTitles: existingTitles)
@@ -231,8 +265,13 @@ final class LibraryViewModel: ObservableObject {
             baseTitle: baseTitle,
             sectionStartIndex: 0
         )
+        let normalizedBaseCounts = SurpriseMeAssembly.dtoCounts(normalizedBase)
+        Self.logger.debug(
+            "Surprise Me base normalized: id=\(normalizedBase.id, privacy: .public) title=\(normalizedBase.title, privacy: .public) sections=\(normalizedBaseCounts.sections, privacy: .public) cards=\(normalizedBaseCounts.cards, privacy: .public)"
+        )
 
         if let secondDTO {
+            Self.logger.debug("Surprise Me merge start")
             let normalizedSecond = normalize(
                 dto: secondDTO,
                 baseID: baseID,
@@ -240,9 +279,32 @@ final class LibraryViewModel: ObservableObject {
                 sectionStartIndex: normalizedBase.sections.count
             )
             normalizedBase = mergeSections(into: normalizedBase, additionalSections: normalizedSecond.sections)
+            let normalizedSecondCounts = SurpriseMeAssembly.dtoCounts(normalizedSecond)
+            let mergedCounts = SurpriseMeAssembly.dtoCounts(normalizedBase)
+            Self.logger.debug(
+                "Surprise Me merge complete: secondSections=\(normalizedSecondCounts.sections, privacy: .public) secondCards=\(normalizedSecondCounts.cards, privacy: .public) mergedSections=\(mergedCounts.sections, privacy: .public) mergedCards=\(mergedCounts.cards, privacy: .public)"
+            )
         }
 
-        return try await contentRepository.appendOrReplaceUserPack(normalizedBase)
+        Self.logger.debug("Surprise Me final validation start")
+        guard normalizedBase.isValid() else {
+            let reason = SurpriseMeAssembly.validationFailureReason(for: normalizedBase)
+            Self.logger.error("Surprise Me final DTO invalid: \(reason, privacy: .public)")
+            throw AIContentService.ServiceError.validationFailed(details: reason)
+        }
+        Self.logger.debug("Surprise Me final validation success")
+
+        Self.logger.debug("Surprise Me persistence start")
+        do {
+            let persisted = try await contentRepository.appendOrReplaceUserPack(normalizedBase)
+            Self.logger.debug("Surprise Me persistence success")
+            return persisted
+        } catch {
+            Self.logger.error(
+                "Surprise Me persistence failed: classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
+            )
+            throw error
+        }
     }
 
     private func recomputeDerivedState() {
@@ -382,23 +444,13 @@ final class LibraryViewModel: ObservableObject {
         baseTitle: String,
         sectionStartIndex: Int
     ) -> TopicPackDTO {
-        var sectionCounter = sectionStartIndex
-        let normalizedSections: [TopicSectionDTO] = dto.sections.map { section in
-            let sectionID = "\(baseID)_section_\(sectionCounter)"
-            defer { sectionCounter += 1 }
-            var cardCounter = 0
-            let cards = section.cards.map { card in
-                let cardID = "\(sectionID)_card_\(cardCounter)"
-                cardCounter += 1
-                return CardDTO(
-                    id: cardID,
-                    front: card.front,
-                    back: card.back,
-                    source: card.source,
-                    tags: card.tags
-                )
-            }
-            return TopicSectionDTO(id: sectionID, title: section.title, cards: cards)
+        let normalized = SurpriseMeAssembly.normalizedSections(
+            from: dto.sections,
+            baseID: baseID,
+            sectionStartIndex: sectionStartIndex
+        )
+        if normalized.droppedEmptySections > 0 {
+            Self.logger.debug("Surprise Me normalize dropped empty sections: \(normalized.droppedEmptySections, privacy: .public)")
         }
 
         return TopicPackDTO(
@@ -411,7 +463,7 @@ final class LibraryViewModel: ObservableObject {
             description: dto.description,
             author: dto.author,
             version: dto.version,
-            sections: normalizedSections
+            sections: normalized.sections
         )
     }
 
@@ -428,6 +480,69 @@ final class LibraryViewModel: ObservableObject {
             version: dto.version,
             sections: dto.sections + additionalSections
         )
+    }
+
+    private func logSurpriseMeError(_ error: Error, stage: String) {
+        Self.logger.error(
+            "Surprise Me stage failed: stage=\(stage, privacy: .public) classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public)"
+        )
+        switch error {
+        case let serviceError as AIContentService.ServiceError:
+            switch serviceError {
+            case .emptyResponse:
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: empty response")
+            case .invalidJSON(let details):
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: invalid JSON - \(details, privacy: .public)")
+            case .dtoDecodingFailed(let details):
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: decode error - \(details, privacy: .public)")
+            case .validationFailed(let details):
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: validation error - \(details, privacy: .public)")
+            }
+        case let clientError as BrieflyBackendClient.ClientError:
+            switch clientError {
+            case .badResponse(let status, _):
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: backend status \(status, privacy: .public)")
+            case .invalidResponse:
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: invalid backend envelope")
+            case .requestTimedOut:
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: request timed out")
+            case .transport(let transportError):
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: transport error \(transportError.localizedDescription, privacy: .public)")
+            }
+        default:
+            Self.logger.error("Surprise Me \(stage, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func surpriseMeErrorClassification(for error: Error) -> String {
+        if let serviceError = error as? AIContentService.ServiceError {
+            switch serviceError {
+            case .emptyResponse:
+                return "empty_response"
+            case .invalidJSON:
+                return "decode_invalid_json"
+            case .dtoDecodingFailed:
+                return "decode_dto_failed"
+            case .validationFailed:
+                return "validation_failed"
+            }
+        }
+        if let clientError = error as? BrieflyBackendClient.ClientError {
+            switch clientError {
+            case .badResponse:
+                return "backend_http_failure"
+            case .invalidResponse:
+                return "backend_invalid_envelope"
+            case .requestTimedOut:
+                return "backend_timeout"
+            case .transport:
+                return "backend_transport_failure"
+            }
+        }
+        if error is ContentRepository.RepositoryError {
+            return "persistence_failure"
+        }
+        return "unknown"
     }
 
     static func sanitizedRandomTopicTitle(generatedTitle: String, requestedTitle: String) -> String {
@@ -475,5 +590,63 @@ final class LibraryViewModel: ObservableObject {
 
         let suffix = UUID().uuidString.prefix(6).lowercased()
         return "practical systems thinking \(suffix)"
+    }
+}
+
+enum SurpriseMeAssembly {
+    struct NormalizedSectionsResult {
+        let sections: [TopicSectionDTO]
+        let droppedEmptySections: Int
+    }
+
+    static func normalizedSections(
+        from sections: [TopicSectionDTO],
+        baseID: String,
+        sectionStartIndex: Int
+    ) -> NormalizedSectionsResult {
+        var sectionCounter = sectionStartIndex
+        var droppedEmptySections = 0
+
+        let normalizedSections: [TopicSectionDTO] = sections.compactMap { section in
+            guard !section.cards.isEmpty else {
+                droppedEmptySections += 1
+                return nil
+            }
+            let sectionID = "\(baseID)_section_\(sectionCounter)"
+            defer { sectionCounter += 1 }
+            var cardCounter = 0
+            let cards = section.cards.map { card in
+                let cardID = "\(sectionID)_card_\(cardCounter)"
+                cardCounter += 1
+                return CardDTO(
+                    id: cardID,
+                    front: card.front,
+                    back: card.back,
+                    source: card.source,
+                    tags: card.tags
+                )
+            }
+            return TopicSectionDTO(id: sectionID, title: section.title, cards: cards)
+        }
+
+        return NormalizedSectionsResult(
+            sections: normalizedSections,
+            droppedEmptySections: droppedEmptySections
+        )
+    }
+
+    static func dtoCounts(_ dto: TopicPackDTO) -> (sections: Int, cards: Int) {
+        (dto.sections.count, dto.sections.reduce(0) { $0 + $1.cards.count })
+    }
+
+    static func validationFailureReason(for dto: TopicPackDTO) -> String {
+        var reasons: [String] = []
+        if dto.id.isEmpty { reasons.append("missing id") }
+        if dto.title.isEmpty { reasons.append("missing title") }
+        if dto.subtitle.isEmpty { reasons.append("missing subtitle") }
+        if dto.category.isEmpty { reasons.append("missing category") }
+        if dto.sections.isEmpty { reasons.append("no sections") }
+        if !dto.sections.contains(where: { !$0.cards.isEmpty }) { reasons.append("no cards in any section") }
+        return reasons.isEmpty ? "unknown validation failure" : reasons.joined(separator: ", ")
     }
 }

@@ -3,6 +3,19 @@ import os
 
 /// High-level service for generating TopicPackDTOs via backend text generation.
 final class AIContentService {
+    enum RequestSizing {
+        static let preferredMaxSectionsPerRequest = 3
+        static let preferredMaxCardsPerSectionPerRequest = 6
+
+        static func sectionsPerRequest(for requested: Int) -> Int {
+            max(1, min(requested, preferredMaxSectionsPerRequest))
+        }
+
+        static func cardsPerSection(for requested: Int) -> Int {
+            max(1, min(requested, preferredMaxCardsPerSectionPerRequest))
+        }
+    }
+
     enum ServiceError: LocalizedError {
         case emptyResponse
         case invalidJSON(details: String)
@@ -130,7 +143,7 @@ final class AIContentService {
     ) -> String {
         """
         You are an expert at creating concise Q&A flashcards.
-        Return ONLY valid JSON for a TopicPackDTO with fields:
+        Return ONLY valid JSON for a TopicPackDTO with these fields:
         id, title, subtitle, category, difficulty (Beginner|Intermediate|Advanced),
         language, description, author, version,
         sections (id, title, cards),
@@ -143,7 +156,6 @@ final class AIContentService {
         - IDs must be unique and URL-safe (use snake_case).
         Create a topic on "\(title)" for \(difficulty.rawValue.lowercased()) learners.
         Language: \(language).
-        Aim for about \(sections) sections with \(cardsPerSection) cards each.
         Difficulty guidance: \(difficultyGuidance(for: difficulty))
         """
     }

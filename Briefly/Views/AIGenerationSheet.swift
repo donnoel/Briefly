@@ -123,15 +123,23 @@ struct AIGenerationSheet: View {
                         viewModel: GeneratedPackReviewViewModel(pack: dto),
                         onSave: { editedDTO in
                             do {
+                                Self.logger.debug(
+                                    "Fresh Topics persistence start: sections=\(editedDTO.sections.count, privacy: .public) cards=\(editedDTO.sections.reduce(0) { $0 + $1.cards.count }, privacy: .public)"
+                                )
                                 if let model = try await ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
+                                    Self.logger.debug("Fresh Topics persistence success")
                                     onSave(model)
                                     isPresented = false
                                     return true
                                 } else {
+                                    Self.logger.error("Fresh Topics persistence failed: classification=persistence_failure reason=append returned nil model")
                                     errorMessage = "Edited content could not be parsed."
                                     return false
                                 }
                             } catch {
+                                Self.logger.error(
+                                    "Fresh Topics persistence failed: classification=\(errorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
+                                )
                                 errorMessage = error.localizedDescription
                                 return false
                             }
@@ -146,6 +154,9 @@ struct AIGenerationSheet: View {
     private func generate() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
+        Self.logger.debug(
+            "Fresh Topics generation start: title=\(trimmedTitle, privacy: .public) targetSections=\(targetSections, privacy: .public) cardsPerSection=\(targetCardsPerSection, privacy: .public)"
+        )
 
         isGenerating = true
         errorMessage = nil
@@ -157,7 +168,14 @@ struct AIGenerationSheet: View {
         generationTask = Task {
             do {
                 let batchSize = max(1, min(targetSections, 5))
-                let totalBatches = max(1, Int(ceil(Double(targetSections) / Double(batchSize))))
+                let perRequestSections = AIContentService.RequestSizing.sectionsPerRequest(for: batchSize)
+                let perRequestCards = AIContentService.RequestSizing.cardsPerSection(for: targetCardsPerSection)
+                if perRequestCards != targetCardsPerSection || perRequestSections != batchSize {
+                    Self.logger.debug(
+                        "Fresh Topics workload tuned for latency: requestedSectionsPerBatch=\(batchSize, privacy: .public) effectiveSectionsPerBatch=\(perRequestSections, privacy: .public) requestedCardsPerSection=\(targetCardsPerSection, privacy: .public) effectiveCardsPerSection=\(perRequestCards, privacy: .public)"
+                    )
+                }
+                let totalBatches = max(1, Int(ceil(Double(targetSections) / Double(perRequestSections))))
 
                 var aggregatedSections: [TopicSectionDTO] = []
                 var baseDTO: TopicPackDTO?
@@ -166,18 +184,26 @@ struct AIGenerationSheet: View {
                 for batch in 0..<totalBatches {
                     try Task.checkCancellation()
                     let remaining = targetSections - aggregatedSections.count
-                    let requestSections = max(1, min(batchSize, remaining))
+                    let requestSections = max(1, min(perRequestSections, remaining))
                     Self.logger.debug(
-                        "Fresh Topics batch \(batch + 1, privacy: .public)/\(totalBatches, privacy: .public) start: requestSections=\(requestSections, privacy: .public) targetCardsPerSection=\(targetCardsPerSection, privacy: .public) currentAggregatedSections=\(aggregatedSections.count, privacy: .public)"
+                        "Fresh Topics batch \(batch + 1, privacy: .public)/\(totalBatches, privacy: .public) start: requestSections=\(requestSections, privacy: .public) requestCardsPerSection=\(perRequestCards, privacy: .public) currentAggregatedSections=\(aggregatedSections.count, privacy: .public)"
                     )
 
-                    let dto = try await service.generateTopicPack(
-                        title: trimmedTitle,
-                        difficulty: difficulty,
-                        language: language,
-                        targetSections: requestSections,
-                        targetCardsPerSection: targetCardsPerSection
-                    )
+                    let dto: TopicPackDTO
+                    do {
+                        dto = try await service.generateTopicPack(
+                            title: trimmedTitle,
+                            difficulty: difficulty,
+                            language: language,
+                            targetSections: requestSections,
+                            targetCardsPerSection: perRequestCards
+                        )
+                    } catch {
+                        Self.logger.error(
+                            "Fresh Topics batch \(batch + 1, privacy: .public) failed: classification=\(errorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
+                        )
+                        throw error
+                    }
 
                     if baseDTO == nil {
                         baseDTO = dto
@@ -226,6 +252,7 @@ struct AIGenerationSheet: View {
                     "Fresh Topics final assembly: sections=\(finalDTO.sections.count, privacy: .public) cards=\(finalCardCount, privacy: .public)"
                 )
 
+                Self.logger.debug("Fresh Topics final validation start")
                 guard finalDTO.isValid() else {
                     let reason = FreshTopicsAssembly.validationFailureReason(for: finalDTO)
                     Self.logger.error("Fresh Topics final DTO invalid: \(reason, privacy: .public)")
@@ -236,6 +263,7 @@ struct AIGenerationSheet: View {
                     }
                     return
                 }
+                Self.logger.debug("Fresh Topics final validation success")
 
                 await MainActor.run {
                     guard !Task.isCancelled else { return }
@@ -248,16 +276,21 @@ struct AIGenerationSheet: View {
                     generationTask = nil
                 }
             } catch is CancellationError {
+                Self.logger.debug("Fresh Topics generation cancelled")
                 await MainActor.run {
                     isGenerating = false
                     progressText = nil
                     generationTask = nil
                 }
             } catch {
+                let userMessage = friendlyError(for: error)
+                Self.logger.error(
+                    "Fresh Topics surfaced error: classification=\(errorClassification(for: error), privacy: .public) message=\(userMessage, privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
+                )
                 await MainActor.run {
                     isGenerating = false
                     progressText = nil
-                    errorMessage = friendlyError(for: error)
+                    errorMessage = userMessage
                     generationTask = nil
                 }
             }
@@ -281,6 +314,37 @@ struct AIGenerationSheet: View {
             return serviceError.localizedDescription
         }
         return "Error: \(error.localizedDescription)"
+    }
+
+    private func errorClassification(for error: Error) -> String {
+        if let serviceError = error as? AIContentService.ServiceError {
+            switch serviceError {
+            case .emptyResponse:
+                return "empty_response"
+            case .invalidJSON:
+                return "decode_invalid_json"
+            case .dtoDecodingFailed:
+                return "decode_dto_failed"
+            case .validationFailed:
+                return "validation_failed"
+            }
+        }
+        if let clientError = error as? BrieflyBackendClient.ClientError {
+            switch clientError {
+            case .badResponse:
+                return "backend_http_failure"
+            case .invalidResponse:
+                return "backend_invalid_envelope"
+            case .requestTimedOut:
+                return "backend_timeout"
+            case .transport:
+                return "backend_transport_failure"
+            }
+        }
+        if error is ContentRepository.RepositoryError {
+            return "persistence_failure"
+        }
+        return "unknown"
     }
 }
 

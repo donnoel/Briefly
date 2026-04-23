@@ -5,6 +5,20 @@ import Testing
 struct AIContentServiceTests {
 
     @Test
+    func requestSizingCapsSectionsPerRequest() {
+        #expect(AIContentService.RequestSizing.sectionsPerRequest(for: 7) == 3)
+        #expect(AIContentService.RequestSizing.sectionsPerRequest(for: 2) == 2)
+        #expect(AIContentService.RequestSizing.sectionsPerRequest(for: 0) == 1)
+    }
+
+    @Test
+    func requestSizingCapsCardsPerSectionPerRequest() {
+        #expect(AIContentService.RequestSizing.cardsPerSection(for: 10) == 6)
+        #expect(AIContentService.RequestSizing.cardsPerSection(for: 4) == 4)
+        #expect(AIContentService.RequestSizing.cardsPerSection(for: 0) == 1)
+    }
+
+    @Test
     func malformedJSONReturnsInvalidJSONError() async throws {
         let service = AIContentService(transport: MockTransport(output: "not-json"))
 

@@ -1,6 +1,9 @@
 import SwiftUI
+import os
 
 struct LibraryView: View {
+    private static let logger = Logger(subsystem: "dn.Briefly", category: "LibraryView")
+
     @EnvironmentObject private var coordinator: AppCoordinator
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: LibraryViewModel
@@ -554,8 +557,42 @@ struct LibraryView: View {
         } catch {
             await MainActor.run {
                 randomError = error.localizedDescription
+                Self.logger.error(
+                    "Surprise Me surfaced error: classification=\(surpriseMeErrorClassification(for: error), privacy: .public) message=\(error.localizedDescription, privacy: .public)"
+                )
             }
         }
+    }
+
+    private func surpriseMeErrorClassification(for error: Error) -> String {
+        if let serviceError = error as? AIContentService.ServiceError {
+            switch serviceError {
+            case .emptyResponse:
+                return "empty_response"
+            case .invalidJSON:
+                return "decode_invalid_json"
+            case .dtoDecodingFailed:
+                return "decode_dto_failed"
+            case .validationFailed:
+                return "validation_failed"
+            }
+        }
+        if let clientError = error as? BrieflyBackendClient.ClientError {
+            switch clientError {
+            case .badResponse:
+                return "backend_http_failure"
+            case .invalidResponse:
+                return "backend_invalid_envelope"
+            case .requestTimedOut:
+                return "backend_timeout"
+            case .transport:
+                return "backend_transport_failure"
+            }
+        }
+        if error is ContentRepository.RepositoryError {
+            return "persistence_failure"
+        }
+        return "unknown"
     }
 
     private var hasVisibleTopics: Bool {

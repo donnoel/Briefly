@@ -18,6 +18,8 @@ struct BrieflyBackendClientTests {
         #expect(request.httpMethod == "POST")
         #expect(request.url?.path == "/prod/generate")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        let correlationID = try #require(request.value(forHTTPHeaderField: "X-Client-Request-ID"))
+        #expect(UUID(uuidString: correlationID) != nil)
 
         let bodyData = try #require(requestBodyData(from: request))
         let body = try JSONDecoder().decode(RequestPayload.self, from: bodyData)

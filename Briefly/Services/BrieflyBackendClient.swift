@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 protocol AIGenerationTransport {
     func generateText(prompt: String) async throws -> String
@@ -6,6 +7,9 @@ protocol AIGenerationTransport {
 
 /// Thin backend client for Briefly generation endpoint.
 final class BrieflyBackendClient: AIGenerationTransport {
+    private static let logger = Logger(subsystem: "dn.Briefly", category: "BrieflyBackendClient")
+    private static let clientRequestIDHeader = "X-Client-Request-ID"
+
     struct Configuration {
         let endpoint: URL
         let timeout: TimeInterval
@@ -79,33 +83,54 @@ final class BrieflyBackendClient: AIGenerationTransport {
     }
 
     func generateText(prompt: String) async throws -> String {
+        let requestID = UUID().uuidString
+        Self.logger.debug(
+            "Backend request start: requestID=\(requestID, privacy: .public) endpoint=\(self.config.endpoint.absoluteString, privacy: .public) promptLength=\(prompt.count, privacy: .public)"
+        )
+
         var request = URLRequest(url: config.endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(requestID, forHTTPHeaderField: Self.clientRequestIDHeader)
         request.httpBody = try JSONEncoder().encode(RequestBody(prompt: prompt))
 
         do {
             let (data, response) = try await urlSession.data(for: request)
             guard let http = response as? HTTPURLResponse else {
+                Self.logger.error("Backend request failed: requestID=\(requestID, privacy: .public) reason=invalid_http_response")
                 throw ClientError.invalidResponse
             }
             guard (200..<300).contains(http.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? ""
+                Self.logger.error(
+                    "Backend non-success response: requestID=\(requestID, privacy: .public) status=\(http.statusCode, privacy: .public) body=\(body, privacy: .public)"
+                )
                 throw ClientError.badResponse(status: http.statusCode, body: body)
             }
 
             let decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
             guard decoded.ok == true, let outputText = decoded.outputText?.trimmingCharacters(in: .whitespacesAndNewlines), !outputText.isEmpty else {
+                Self.logger.error("Backend request failed: requestID=\(requestID, privacy: .public) reason=invalid_response_envelope")
                 throw ClientError.invalidResponse
             }
+            let lambdaRequestID = (http.value(forHTTPHeaderField: "X-Lambda-Request-ID") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let echoedClientID = (http.value(forHTTPHeaderField: Self.clientRequestIDHeader) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            Self.logger.debug(
+                "Backend request success: requestID=\(requestID, privacy: .public) echoedClientRequestID=\(echoedClientID, privacy: .public) lambdaRequestID=\(lambdaRequestID, privacy: .public) outputLength=\(outputText.count, privacy: .public)"
+            )
             return outputText
         } catch let clientError as ClientError {
             throw clientError
         } catch is DecodingError {
+            Self.logger.error("Backend request failed: requestID=\(requestID, privacy: .public) reason=response_decode_error")
             throw ClientError.invalidResponse
         } catch let urlError as URLError where urlError.code == .timedOut {
+            Self.logger.error("Backend request failed: requestID=\(requestID, privacy: .public) reason=request_timed_out")
             throw ClientError.requestTimedOut
         } catch {
+            Self.logger.error(
+                "Backend request failed: requestID=\(requestID, privacy: .public) reason=transport_error details=\(error.localizedDescription, privacy: .public)"
+            )
             throw ClientError.transport(error)
         }
     }
