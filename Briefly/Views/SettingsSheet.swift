@@ -2,62 +2,17 @@ import SwiftUI
 
 struct SettingsSheet: View {
     @Binding var isPresented: Bool
-    @State private var apiKey: String = ""
-    @State private var statusMessage: String?
-    @State private var selectedModel: String = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
-    @State private var showingKeyEntry = false
-    @State private var pendingKey: String = ""
-
-    private let modelOptions: [(id: String, note: String)] = [
-        ("gpt-4.1-mini", "Fast & cheap"),
-        ("gpt-4o-mini", "Fast, multimodal-lite"),
-        ("gpt-4.1", "Better quality"),
-        ("gpt-4o", "Higher quality"),
-        ("gpt-5.1", "Best quality")
-    ]
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("OpenAI API Key") {
-                    HStack {
-                        Label(keyStatusText, systemImage: keyStatusIcon)
-                            .foregroundColor(keyStatusColor)
-                        Spacer()
-                        Button {
-                            pendingKey = ""
-                            showingKeyEntry = true
-                        } label: {
-                            Text("Manage")
-                        }
-                        .buttonStyle(BrieflyCompactPrimaryButtonStyle())
-                    }
-                    if let statusMessage {
-                        Text(statusMessage)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                Section("AI Generation") {
+                    Label("No API key needed", systemImage: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                    Text("Briefly now uses a managed backend for AI topic generation.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-
-                Section("Model") {
-                    Picker("Preferred Model", selection: $selectedModel) {
-                        ForEach(modelOptions, id: \.id) { model in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(model.id)
-                                Text(model.note)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            .tag(model.id)
-                        }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .onChange(of: selectedModel, initial: false) { _, newValue in
-                        ModelPreferenceStore.shared.preferredModel = newValue
-                        statusMessage = "Model set to \(newValue)."
-                    }
-                }
-
             }
             .navigationTitle("Settings")
             .toolbar {
@@ -66,63 +21,5 @@ struct SettingsSheet: View {
                 }
             }
         }
-        .sheet(isPresented: $showingKeyEntry) {
-            NavigationStack {
-                Form {
-                    Section("OpenAI API Key") {
-                        SecureField("Enter or paste key", text: $pendingKey)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        Button(role: .destructive) {
-                            APIKeyStore.shared.apiKey = nil
-                            statusMessage = "Key removed."
-                            pendingKey = ""
-                            showingKeyEntry = false
-                        } label: {
-                            Label("Clear Key", systemImage: "trash")
-                        }
-                        Text("Keys are stored securely in the iOS Keychain.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .navigationTitle("Set API Key")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { showingKeyEntry = false }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            APIKeyStore.shared.apiKey = pendingKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                            statusMessage = "Saved to Keychain."
-                            pendingKey = ""
-                            showingKeyEntry = false
-                        }
-                        .disabled(pendingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-            }
-        }
-    }
-
-    private var keyStatusText: String {
-        if let currentKey = APIKeyStore.shared.apiKey, !currentKey.isEmpty {
-            return "Key saved"
-        }
-        return "Key not set"
-    }
-
-    private var keyStatusIcon: String {
-        if let currentKey = APIKeyStore.shared.apiKey, !currentKey.isEmpty {
-            return "checkmark.seal.fill"
-        }
-        return "exclamationmark.triangle.fill"
-    }
-
-    private var keyStatusColor: Color {
-        if let currentKey = APIKeyStore.shared.apiKey, !currentKey.isEmpty {
-            return .green
-        }
-        return .orange
     }
 }

@@ -1,6 +1,9 @@
 import SwiftUI
+import os
 
 struct AIGenerationSheet: View {
+    private static let logger = Logger(subsystem: "dn.Briefly", category: "AIGenerationSheet")
+
     @Binding var isPresented: Bool
     var onSave: (TopicPack) -> Void
 
@@ -143,24 +146,13 @@ struct AIGenerationSheet: View {
     private func generate() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
-        guard let apiKey = APIKeyStore.shared.apiKey, !apiKey.isEmpty else {
-            errorMessage = "Please set your OpenAI API key in Settings."
-            return
-        }
 
         isGenerating = true
         errorMessage = nil
         progressFraction = 0
         progressText = "Starting…"
-        APIKeyStore.shared.apiKey = apiKey
         cancelGeneration(resetUI: false)
-        let preferredModel = ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
-        let configuration = OpenAIClient.Configuration(
-            apiKeyProvider: { apiKey },
-            model: preferredModel
-        )
-        let client = OpenAIClient(configuration: configuration)
-        let service = AIContentService(client: client)
+        let service = AIContentService(transport: BrieflyBackendClient())
 
         generationTask = Task {
             do {
@@ -175,6 +167,9 @@ struct AIGenerationSheet: View {
                     try Task.checkCancellation()
                     let remaining = targetSections - aggregatedSections.count
                     let requestSections = max(1, min(batchSize, remaining))
+                    Self.logger.debug(
+                        "Fresh Topics batch \(batch + 1, privacy: .public)/\(totalBatches, privacy: .public) start: requestSections=\(requestSections, privacy: .public) targetCardsPerSection=\(targetCardsPerSection, privacy: .public) currentAggregatedSections=\(aggregatedSections.count, privacy: .public)"
+                    )
 
                     let dto = try await service.generateTopicPack(
                         title: trimmedTitle,
@@ -186,27 +181,22 @@ struct AIGenerationSheet: View {
 
                     if baseDTO == nil {
                         baseDTO = dto
-                    }
-                    for section in dto.sections {
-                        if aggregatedSections.count >= targetSections { break }
-                        let normalizedID = "\(dto.id)_section_\(sectionCounter)"
-                        sectionCounter += 1
-                        let normalizedSection = TopicSectionDTO(
-                            id: normalizedID,
-                            title: section.title,
-                            cards: section.cards.enumerated().map { index, card in
-                                let cardID = "\(normalizedID)_card_\(index)"
-                                return CardDTO(
-                                    id: cardID,
-                                    front: card.front,
-                                    back: card.back,
-                                    source: card.source,
-                                    tags: card.tags
-                                )
-                            }
+                        Self.logger.debug(
+                            "Fresh Topics base DTO selected: id=\(dto.id, privacy: .public) title=\(dto.title, privacy: .public) category=\(dto.category, privacy: .public) difficulty=\(dto.difficulty, privacy: .public)"
                         )
-                        aggregatedSections.append(normalizedSection)
                     }
+                    let baseID = baseDTO?.id ?? dto.id
+                    let assembly = FreshTopicsAssembly.appendSections(
+                        from: dto,
+                        baseID: baseID,
+                        into: &aggregatedSections,
+                        targetSections: targetSections,
+                        sectionCounter: &sectionCounter
+                    )
+                    let returnedCardCount = dto.sections.reduce(0) { $0 + $1.cards.count }
+                    Self.logger.debug(
+                        "Fresh Topics batch \(batch + 1, privacy: .public) complete: returnedSections=\(dto.sections.count, privacy: .public) returnedCards=\(returnedCardCount, privacy: .public) addedSections=\(assembly.addedSections, privacy: .public) addedCards=\(assembly.addedCards, privacy: .public) droppedEmptySections=\(assembly.droppedEmptySections, privacy: .public) aggregatedSections=\(aggregatedSections.count, privacy: .public)"
+                    )
 
                     await MainActor.run {
                         guard !Task.isCancelled else { return }
@@ -215,7 +205,9 @@ struct AIGenerationSheet: View {
                     }
                 }
 
-                guard let base = baseDTO else { throw AIContentService.ServiceError.invalidResponse }
+                guard let base = baseDTO else {
+                    throw AIContentService.ServiceError.validationFailed(details: "missing base DTO from generation")
+                }
 
                 let finalDTO = TopicPackDTO(
                     id: base.id,
@@ -229,8 +221,14 @@ struct AIGenerationSheet: View {
                     version: base.version,
                     sections: aggregatedSections
                 )
+                let finalCardCount = finalDTO.sections.reduce(0) { $0 + $1.cards.count }
+                Self.logger.debug(
+                    "Fresh Topics final assembly: sections=\(finalDTO.sections.count, privacy: .public) cards=\(finalCardCount, privacy: .public)"
+                )
 
                 guard finalDTO.isValid() else {
+                    let reason = FreshTopicsAssembly.validationFailureReason(for: finalDTO)
+                    Self.logger.error("Fresh Topics final DTO invalid: \(reason, privacy: .public)")
                     await MainActor.run {
                         isGenerating = false
                         progressText = nil
@@ -276,15 +274,80 @@ struct AIGenerationSheet: View {
     }
 
     private func friendlyError(for error: Error) -> String {
-        if let clientError = error as? OpenAIClient.ClientError {
+        if let clientError = error as? BrieflyBackendClient.ClientError {
             return clientError.localizedDescription
         }
         if let serviceError = error as? AIContentService.ServiceError {
-            switch serviceError {
-            case .emptyResponse, .invalidResponse, .decodingFailed:
-                return "AI response was invalid. Try again with a clearer title."
-            }
+            return serviceError.localizedDescription
         }
         return "Error: \(error.localizedDescription)"
+    }
+}
+
+enum FreshTopicsAssembly {
+    struct AppendResult {
+        let addedSections: Int
+        let addedCards: Int
+        let droppedEmptySections: Int
+    }
+
+    static func appendSections(
+        from dto: TopicPackDTO,
+        baseID: String,
+        into aggregatedSections: inout [TopicSectionDTO],
+        targetSections: Int,
+        sectionCounter: inout Int
+    ) -> AppendResult {
+        var addedSections = 0
+        var addedCards = 0
+        var droppedEmptySections = 0
+
+        for section in dto.sections {
+            if aggregatedSections.count >= targetSections { break }
+            guard !section.cards.isEmpty else {
+                droppedEmptySections += 1
+                continue
+            }
+
+            let normalizedID = "\(baseID)_section_\(sectionCounter)"
+            sectionCounter += 1
+
+            let normalizedCards = section.cards.enumerated().map { index, card in
+                let cardID = "\(normalizedID)_card_\(index)"
+                return CardDTO(
+                    id: cardID,
+                    front: card.front,
+                    back: card.back,
+                    source: card.source,
+                    tags: card.tags
+                )
+            }
+
+            let normalizedSection = TopicSectionDTO(
+                id: normalizedID,
+                title: section.title,
+                cards: normalizedCards
+            )
+            aggregatedSections.append(normalizedSection)
+            addedSections += 1
+            addedCards += normalizedCards.count
+        }
+
+        return AppendResult(
+            addedSections: addedSections,
+            addedCards: addedCards,
+            droppedEmptySections: droppedEmptySections
+        )
+    }
+
+    static func validationFailureReason(for dto: TopicPackDTO) -> String {
+        var reasons: [String] = []
+        if dto.id.isEmpty { reasons.append("missing id") }
+        if dto.title.isEmpty { reasons.append("missing title") }
+        if dto.subtitle.isEmpty { reasons.append("missing subtitle") }
+        if dto.category.isEmpty { reasons.append("missing category") }
+        if dto.sections.isEmpty { reasons.append("no sections") }
+        if !dto.sections.contains(where: { !$0.cards.isEmpty }) { reasons.append("no cards in any section") }
+        return reasons.isEmpty ? "unknown validation failure" : reasons.joined(separator: ", ")
     }
 }

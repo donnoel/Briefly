@@ -154,10 +154,6 @@ final class LibraryViewModel: ObservableObject {
         targetSections: Int = 5,
         cardsPerSection: Int = 10
     ) async throws -> TopicPack? {
-        guard let apiKey = APIKeyStore.shared.apiKey, !apiKey.isEmpty else {
-            throw RandomTopicError.missingAPIKey
-        }
-
         let existingTitles = Set(topics.map { $0.title.lowercased() })
         let existingIDs = Set(topics.map { $0.id.lowercased() })
 
@@ -194,11 +190,7 @@ final class LibraryViewModel: ObservableObject {
 
         let difficulty = Difficulty.allCases.randomElement() ?? .beginner
 
-        let config = OpenAIClient.Configuration(
-            apiKeyProvider: { apiKey },
-            model: ModelPreferenceStore.shared.preferredModel ?? "gpt-4.1-mini"
-        )
-        let service = AIContentService(client: OpenAIClient(configuration: config))
+        let service = AIContentService(transport: BrieflyBackendClient())
 
         // Progressive strategy: request sections in two smaller batches concurrently, then merge.
         let firstTarget = min(targetSections, 3)
@@ -251,17 +243,6 @@ final class LibraryViewModel: ObservableObject {
         }
 
         return try await contentRepository.appendOrReplaceUserPack(normalizedBase)
-    }
-
-    enum RandomTopicError: LocalizedError {
-        case missingAPIKey
-
-        var errorDescription: String? {
-            switch self {
-            case .missingAPIKey:
-                return "Please set your OpenAI API key in Settings."
-            }
-        }
     }
 
     private func recomputeDerivedState() {

@@ -4,8 +4,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/SwiftUI-iOS-orange?logo=swift">
   <img src="https://img.shields.io/badge/Architecture-MVVM%20%2B%20Stores-purple">
-  <img src="https://img.shields.io/badge/AI-OpenAI%20API-green?logo=openai">
-  <img src="https://img.shields.io/badge/Storage-Keychain%20%2B%20Documents%20JSON-blue">
+  <img src="https://img.shields.io/badge/AI-Backend%20Generation-green">
+  <img src="https://img.shields.io/badge/Storage-Documents%20JSON%20%2B%20iCloud-blue">
 </p>
 
 ---
@@ -20,7 +20,7 @@ You can:
 - reveal answers, then mark cards as **Next** (or **Finish section** on the last card) or **Review again**,
 - track progress over time.
 
-If you want new material, Briefly can **generate a full topic pack using the OpenAI API**, then lets you **review/edit it before saving**.
+If you want new material, Briefly can **generate a full topic pack through Briefly's backend**, then lets you **review/edit it before saving**.
 
 ---
 
@@ -32,11 +32,11 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 | 🎴 **Deck Sessions** | Review one section at a time with a clean “reveal then rate” flow. |
 | ✅ **Progress Tracking** | Remembers learned cards + completed sections and shows progress per topic. |
 | 🔁 **Review Loop** | Mark **Next** to advance (or **Finish section** on the last card), or **Review again** to repeat. |
-| 🪄 **AI Topic Generation** | Generate multi-section packs (with card sources/tags) using OpenAI. |
+| 🪄 **AI Topic Generation** | Generate multi-section packs (with card sources/tags) through Briefly's backend generation service. |
 | 🧾 **Review Before Save** | Generated packs open in a review screen so you can refine before saving. |
 | ☁️ **iCloud Topic Sync** | User-created topics and topic order sync through your private iCloud database across devices on the same Apple ID, including CloudKit push refresh. |
 | 🔎 **Search + Filters** | Search topics and filter by category/difficulty. |
-| 🗃️ **Local Persistence** | User-created content persists to disk; API keys stored securely. |
+| 🗃️ **Local Persistence** | User-created content persists to disk and syncs through iCloud when available. |
 
 ---
 
@@ -83,16 +83,12 @@ If you want new material, Briefly can **generate a full topic pack using the Ope
 
 ---
 
-## 🔑 OpenAI API Key
+## 🔒 AI Generation Access
 
-Briefly requires an OpenAI API key to generate content.
+Briefly no longer requires a user-provided OpenAI API key for generation.
 
-- Open **Settings** (gear icon)
-- Tap **Manage** under *OpenAI API Key*
-- Paste the key and save
-- App version/build is also shown in iOS Settings for Briefly under **Version**
-
-**Storage:** the API key is stored securely in the iOS **Keychain**.
+- Open **Settings** (gear icon) to confirm backend generation status.
+- App version/build is shown in iOS Settings for Briefly under **Version**.
 
 ---
 
@@ -116,7 +112,7 @@ Briefly is organized around a few simple layers:
 - `RecentTopicsStore` keeps a lightweight recent-topic ID list in `UserDefaults` so the library can surface resume-friendly cards without changing topic content or progress data.
 
 ### AI
-- `OpenAIClient` performs API requests.
+- `BrieflyBackendClient` performs backend generation requests.
 - `AIContentService` generates a `TopicPackDTO`.
 - `GeneratedPackReviewView` lets you review/edit before saving.
 
@@ -147,8 +143,9 @@ Briefly/
 │   ├── TopicModels.swift
 │   └── TopicDTOs.swift
 ├── Services/
-│   ├── OpenAIClient.swift
+│   ├── BrieflyBackendClient.swift
 │   ├── AIContentService.swift
+│   ├── OpenAIClient.swift
 │   ├── APIKeyStore.swift
 │   ├── KeychainStore.swift
 │   └── ModelPreferenceStore.swift
@@ -167,13 +164,11 @@ Briefly/
 ### Requirements
 - Xcode
 - iOS Simulator or device
-- (Optional) OpenAI API key for AI generation
 
 ### Run
 1. Open the project in Xcode
 2. Select an iOS simulator
 3. Build & Run
-4. In-app: set your API key in **Settings** if you want AI generation
 
 ---
 

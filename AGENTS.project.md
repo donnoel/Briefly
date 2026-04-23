@@ -13,14 +13,14 @@ Success means users can reliably add content, complete deck sessions, and resume
 - Section-based deck sessions with reveal-and-rate flow
 - Local persistence for user topic packs (`user_content.json`)
 - Topic completion/deletion/order persistence in `UserDefaults`
-- OpenAI-assisted topic generation with review/edit-before-save
-- Settings management for API key (Keychain) and model preference
+- Backend-assisted topic generation with review/edit-before-save
+- Settings surface for generation status and app preferences
 
 2) Architecture boundaries
 - SwiftUI views: rendering and user interaction
 - View models: screen state + intents
 - Stores/repository: persistence, ordering, completion/deletion, progress
-- Services: OpenAI client, content generation, keychain/preferences
+- Services: backend generation client, content generation, keychain/preferences
 
 3) Reliability and UX goals
 - Clean build with no warnings
@@ -47,6 +47,7 @@ Success means users can reliably add content, complete deck sessions, and resume
   - `/Users/donnoel/Development/Briefly/Briefly/Store/ProgressStore.swift`
   - `/Users/donnoel/Development/Briefly/Briefly/Store/RecentTopicsStore.swift`
 - AI services:
+  - `/Users/donnoel/Development/Briefly/Briefly/Services/BrieflyBackendClient.swift`
   - `/Users/donnoel/Development/Briefly/Briefly/Services/OpenAIClient.swift`
   - `/Users/donnoel/Development/Briefly/Briefly/Services/AIContentService.swift`
 
@@ -61,7 +62,7 @@ Success means users can reliably add content, complete deck sessions, and resume
 - Re-added topics with the same id should persist across relaunch.
 - Active topic ordering must persist after reorder and deletion.
 - Deck progress and section completion should remain stable across launches.
-- API key stays in Keychain; topic content stays in local JSON.
+- Topic content stays in local JSON; generation transport goes through the managed backend.
 
 ## UX rules
 - Keep flows simple and readable for short study sessions.
