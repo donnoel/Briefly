@@ -86,6 +86,66 @@ struct BrieflyBackendClientTests {
         }
     }
 
+    @Test
+    func jobLifecycleCompletesAndReturnsResult() async throws {
+        let transport = makeTransport(responses: [
+            .http(status: 200, body: #"{"ok":true,"outputText":"{\"id\":\"from_job\"}"}"#)
+        ])
+        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+
+        let jobID = try await client.startGenerationJob(prompt: "Generate job payload")
+
+        var status = try await client.fetchGenerationJobStatus(id: jobID)
+        var attempts = 0
+        while status.state != .completed && attempts < 20 {
+            try await Task.sleep(nanoseconds: 20_000_000)
+            status = try await client.fetchGenerationJobStatus(id: jobID)
+            attempts += 1
+        }
+
+        #expect(status.state == .completed)
+        let result = try await client.fetchGenerationJobResult(id: jobID)
+        #expect(result == #"{"id":"from_job"}"#)
+    }
+
+    @Test
+    func jobLifecyclePropagatesBackendFailure() async throws {
+        let transport = makeTransport(responses: [
+            .http(status: 503, body: #"{"message":"unavailable"}"#)
+        ])
+        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+
+        let jobID = try await client.startGenerationJob(prompt: "Generate job payload")
+
+        var status = try await client.fetchGenerationJobStatus(id: jobID)
+        var attempts = 0
+        while attempts < 20 {
+            if case .failed = status.state {
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+            status = try await client.fetchGenerationJobStatus(id: jobID)
+            attempts += 1
+        }
+
+        if case .failed(let reason) = status.state {
+            #expect(!reason.isEmpty)
+        } else {
+            #expect(Bool(false))
+        }
+
+        do {
+            _ = try await client.fetchGenerationJobResult(id: jobID)
+            #expect(Bool(false))
+            return
+        } catch let error as BrieflyBackendClient.ClientError {
+            guard case .jobFailed = error else {
+                #expect(Bool(false))
+                return
+            }
+        }
+    }
+
     private func makeClient(session: URLSession, endpoint: URL) -> BrieflyBackendClient {
         let config = BrieflyBackendClient.Configuration(endpoint: endpoint)
         return BrieflyBackendClient(configuration: config, urlSession: session)

@@ -575,6 +575,8 @@ struct LibraryView: View {
                 return "decode_dto_failed"
             case .validationFailed:
                 return "validation_failed"
+            case .jobTransportUnavailable:
+                return "job_transport_unavailable"
             }
         }
         if let clientError = error as? BrieflyBackendClient.ClientError {
@@ -587,6 +589,12 @@ struct LibraryView: View {
                 return "backend_timeout"
             case .transport:
                 return "backend_transport_failure"
+            case .jobNotFound:
+                return "job_not_found"
+            case .jobNotReady:
+                return "job_not_ready"
+            case .jobFailed:
+                return "job_failed"
             }
         }
         if error is ContentRepository.RepositoryError {

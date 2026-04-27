@@ -6,7 +6,7 @@ protocol AIGenerationTransport {
 }
 
 /// Thin backend client for Briefly generation endpoint.
-final class BrieflyBackendClient: AIGenerationTransport {
+final class BrieflyBackendClient: AIGenerationTransport, AIGenerationJobTransport {
     private static let logger = Logger(subsystem: "dn.Briefly", category: "BrieflyBackendClient")
     private static let clientRequestIDHeader = "X-Client-Request-ID"
 
@@ -27,6 +27,9 @@ final class BrieflyBackendClient: AIGenerationTransport {
         case badResponse(status: Int, body: String)
         case invalidResponse
         case requestTimedOut
+        case jobNotFound(id: String)
+        case jobNotReady
+        case jobFailed(reason: String)
         case transport(Error)
 
         var errorDescription: String? {
@@ -48,6 +51,12 @@ final class BrieflyBackendClient: AIGenerationTransport {
                 return "The generation service returned an unexpected response. Please try again."
             case .requestTimedOut:
                 return "The generation request timed out. Try again or request fewer sections."
+            case .jobNotFound:
+                return "The generation job could not be found. Please try again."
+            case .jobNotReady:
+                return "The generation job is still in progress. Please wait and try again."
+            case .jobFailed(let reason):
+                return "The generation job failed: \(reason)"
             case .transport(let error):
                 if let urlError = error as? URLError, urlError.code == .notConnectedToInternet {
                     return "You appear to be offline. Check your connection and try again."
@@ -66,8 +75,67 @@ final class BrieflyBackendClient: AIGenerationTransport {
         let outputText: String?
     }
 
+    private actor JobStore {
+        enum State {
+            case queued
+            case running
+            case completed(result: String)
+            case failed(reason: String)
+        }
+
+        private var states: [AIGenerationJobID: State] = [:]
+
+        func create(jobID: AIGenerationJobID) {
+            states[jobID] = .queued
+        }
+
+        func markRunning(jobID: AIGenerationJobID) {
+            states[jobID] = .running
+        }
+
+        func markCompleted(jobID: AIGenerationJobID, result: String) {
+            states[jobID] = .completed(result: result)
+        }
+
+        func markFailed(jobID: AIGenerationJobID, reason: String) {
+            states[jobID] = .failed(reason: reason)
+        }
+
+        func status(for jobID: AIGenerationJobID) -> AIGenerationJobStatus? {
+            guard let state = states[jobID] else { return nil }
+
+            let mappedState: AIGenerationJobState
+            switch state {
+            case .queued:
+                mappedState = .queued
+            case .running:
+                mappedState = .running
+            case .completed:
+                mappedState = .completed
+            case .failed(let reason):
+                mappedState = .failed(reason: reason)
+            }
+
+            return AIGenerationJobStatus(id: jobID, state: mappedState)
+        }
+
+        func result(for jobID: AIGenerationJobID) -> Result<String, ClientError>? {
+            guard let state = states[jobID] else { return .failure(.jobNotFound(id: jobID.rawValue)) }
+
+            switch state {
+            case .queued, .running:
+                return .failure(.jobNotReady)
+            case .completed(let result):
+                return .success(result)
+            case .failed(let reason):
+                return .failure(.jobFailed(reason: reason))
+            }
+        }
+    }
+
     private let config: Configuration
     private let urlSession: URLSession
+    private let jobStore = JobStore()
 
     init(configuration: Configuration = .init(), urlSession: URLSession? = nil) {
         self.config = configuration
@@ -84,6 +152,50 @@ final class BrieflyBackendClient: AIGenerationTransport {
 
     func generateText(prompt: String) async throws -> String {
         let requestID = UUID().uuidString
+        return try await sendGenerateRequest(prompt: prompt, requestID: requestID)
+    }
+
+    func startGenerationJob(prompt: String) async throws -> AIGenerationJobID {
+        let jobID = AIGenerationJobID()
+        await jobStore.create(jobID: jobID)
+        Self.logger.debug("Backend job start: jobID=\(jobID.rawValue, privacy: .public) promptLength=\(prompt.count, privacy: .public)")
+
+        Task {
+            await self.jobStore.markRunning(jobID: jobID)
+            do {
+                let output = try await self.generateText(prompt: prompt)
+                await self.jobStore.markCompleted(jobID: jobID, result: output)
+                Self.logger.debug("Backend job completed: jobID=\(jobID.rawValue, privacy: .public) outputLength=\(output.count, privacy: .public)")
+            } catch {
+                await self.jobStore.markFailed(jobID: jobID, reason: error.localizedDescription)
+                Self.logger.error("Backend job failed: jobID=\(jobID.rawValue, privacy: .public) reason=\(error.localizedDescription, privacy: .public)")
+            }
+        }
+
+        return jobID
+    }
+
+    func fetchGenerationJobStatus(id: AIGenerationJobID) async throws -> AIGenerationJobStatus {
+        if let status = await jobStore.status(for: id) {
+            return status
+        }
+        throw ClientError.jobNotFound(id: id.rawValue)
+    }
+
+    func fetchGenerationJobResult(id: AIGenerationJobID) async throws -> String {
+        guard let result = await jobStore.result(for: id) else {
+            throw ClientError.jobNotFound(id: id.rawValue)
+        }
+
+        switch result {
+        case .success(let output):
+            return output
+        case .failure(let error):
+            throw error
+        }
+    }
+
+    private func sendGenerateRequest(prompt: String, requestID: String) async throws -> String {
         Self.logger.debug(
             "Backend request start: requestID=\(requestID, privacy: .public) endpoint=\(self.config.endpoint.absoluteString, privacy: .public) promptLength=\(prompt.count, privacy: .public)"
         )

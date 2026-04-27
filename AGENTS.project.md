@@ -48,8 +48,16 @@ Success means users can reliably add content, complete deck sessions, and resume
   - `/Users/donnoel/Development/Briefly/Briefly/Store/RecentTopicsStore.swift`
 - AI services:
   - `/Users/donnoel/Development/Briefly/Briefly/Services/BrieflyBackendClient.swift`
+  - `/Users/donnoel/Development/Briefly/Briefly/Services/AIGenerationJobTransport.swift`
   - `/Users/donnoel/Development/Briefly/Briefly/Services/OpenAIClient.swift`
   - `/Users/donnoel/Development/Briefly/Briefly/Services/AIContentService.swift`
+
+## Generation backend migration notes
+- Current production path remains synchronous text generation via `AIGenerationTransport.generateText(prompt:)`.
+- App now includes an additive async-job seam (`AIGenerationJobTransport`) with `start/status/result` methods.
+- `AIContentService` exposes job-based methods that reuse existing JSON normalization, DTO decode, trimming, and validation.
+- `BrieflyBackendClient` currently bridges job semantics in-process while backend `/jobs` endpoints are being rolled out.
+- When backend job endpoints are ready, swap `BrieflyBackendClient` job method internals to call `/jobs` without changing view/view-model call sites.
 
 ## Concurrency rules (important)
 - Keep SwiftUI-facing state on `@MainActor`.

@@ -90,6 +90,46 @@ struct AIContentServiceTests {
         #expect(!validationMessage.localizedCaseInsensitiveContains("temporarily unavailable"))
     }
 
+    @Test
+    func startAndResolveJobUsesSameDecodeValidationPath() async throws {
+        let jobID = AIGenerationJobID(rawValue: "job-1")
+        let transport = MockJobTransport(
+            output: validDTOJSON,
+            status: .completed,
+            fixedJobID: jobID
+        )
+        let service = AIContentService(transport: transport, jobTransport: transport)
+
+        let handle = try await service.startTopicPackGenerationJob(
+            title: "Feet",
+            difficulty: .beginner
+        )
+        #expect(handle.id == jobID)
+
+        let status = try await service.fetchTopicPackGenerationJobStatus(jobID: handle.id)
+        #expect(status.state == .completed)
+
+        let dto = try await service.fetchTopicPackGenerationJobResult(handle: handle)
+        #expect(dto.id == "feet_pack")
+        #expect(dto.sections.count == 1)
+    }
+
+    @Test
+    func jobAPIsReturnUnavailableWhenTransportDoesNotSupportJobs() async throws {
+        let service = AIContentService(transport: MockTransport(output: validDTOJSON))
+
+        do {
+            _ = try await service.startTopicPackGenerationJob(title: "Feet", difficulty: .beginner)
+            #expect(Bool(false))
+            return
+        } catch let error as AIContentService.ServiceError {
+            guard case .jobTransportUnavailable = error else {
+                #expect(Bool(false))
+                return
+            }
+        }
+    }
+
     private var validDTOJSON: String {
         #"{"id":"feet_pack","title":"Feet","subtitle":"Intro","category":"Anatomy","difficulty":"Beginner","language":"en","description":"","author":"Briefly","version":"1.0","sections":[{"id":"s1","title":"Basics","cards":[{"id":"c1","front":"What are feet?","back":"Feet support standing and movement.","source":null,"tags":["anatomy"]}]}]}"#
     }
@@ -99,6 +139,28 @@ private struct MockTransport: AIGenerationTransport {
     let output: String
 
     func generateText(prompt: String) async throws -> String {
+        output
+    }
+}
+
+private struct MockJobTransport: AIGenerationTransport, AIGenerationJobTransport {
+    let output: String
+    let status: AIGenerationJobState
+    let fixedJobID: AIGenerationJobID
+
+    func generateText(prompt: String) async throws -> String {
+        output
+    }
+
+    func startGenerationJob(prompt: String) async throws -> AIGenerationJobID {
+        fixedJobID
+    }
+
+    func fetchGenerationJobStatus(id: AIGenerationJobID) async throws -> AIGenerationJobStatus {
+        AIGenerationJobStatus(id: id, state: status)
+    }
+
+    func fetchGenerationJobResult(id: AIGenerationJobID) async throws -> String {
         output
     }
 }

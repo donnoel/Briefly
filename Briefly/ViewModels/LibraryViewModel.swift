@@ -497,6 +497,8 @@ final class LibraryViewModel: ObservableObject {
                 Self.logger.error("Surprise Me \(stage, privacy: .public) failed: decode error - \(details, privacy: .public)")
             case .validationFailed(let details):
                 Self.logger.error("Surprise Me \(stage, privacy: .public) failed: validation error - \(details, privacy: .public)")
+            case .jobTransportUnavailable:
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: job transport unavailable")
             }
         case let clientError as BrieflyBackendClient.ClientError:
             switch clientError {
@@ -508,6 +510,12 @@ final class LibraryViewModel: ObservableObject {
                 Self.logger.error("Surprise Me \(stage, privacy: .public) failed: request timed out")
             case .transport(let transportError):
                 Self.logger.error("Surprise Me \(stage, privacy: .public) failed: transport error \(transportError.localizedDescription, privacy: .public)")
+            case .jobNotFound(let id):
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: job not found id=\(id, privacy: .public)")
+            case .jobNotReady:
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: job not ready")
+            case .jobFailed(let reason):
+                Self.logger.error("Surprise Me \(stage, privacy: .public) failed: job failed - \(reason, privacy: .public)")
             }
         default:
             Self.logger.error("Surprise Me \(stage, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
@@ -525,6 +533,8 @@ final class LibraryViewModel: ObservableObject {
                 return "decode_dto_failed"
             case .validationFailed:
                 return "validation_failed"
+            case .jobTransportUnavailable:
+                return "job_transport_unavailable"
             }
         }
         if let clientError = error as? BrieflyBackendClient.ClientError {
@@ -537,6 +547,12 @@ final class LibraryViewModel: ObservableObject {
                 return "backend_timeout"
             case .transport:
                 return "backend_transport_failure"
+            case .jobNotFound:
+                return "job_not_found"
+            case .jobNotReady:
+                return "job_not_ready"
+            case .jobFailed:
+                return "job_failed"
             }
         }
         if error is ContentRepository.RepositoryError {

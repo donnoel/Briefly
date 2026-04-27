@@ -3,6 +3,19 @@ import os
 
 /// High-level service for generating TopicPackDTOs via backend text generation.
 final class AIContentService {
+    struct GenerationJobRequest {
+        let title: String
+        let difficulty: Difficulty
+        let language: String
+        let targetSections: Int
+        let targetCardsPerSection: Int
+    }
+
+    struct GenerationJobHandle {
+        let id: AIGenerationJobID
+        let request: GenerationJobRequest
+    }
+
     enum RequestSizing {
         static let preferredMaxSectionsPerRequest = 3
         static let preferredMaxCardsPerSectionPerRequest = 6
@@ -21,6 +34,7 @@ final class AIContentService {
         case invalidJSON(details: String)
         case dtoDecodingFailed(details: String)
         case validationFailed(details: String)
+        case jobTransportUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -32,6 +46,8 @@ final class AIContentService {
                 return "The generated content format was unexpected. Please try again."
             case .validationFailed:
                 return "The generated topic was incomplete. Please try again."
+            case .jobTransportUnavailable:
+                return "This version of the app does not support background generation yet."
             }
         }
     }
@@ -39,13 +55,15 @@ final class AIContentService {
     private static let logger = Logger(subsystem: "dn.Briefly", category: "AIContentService")
 
     private let transport: AIGenerationTransport
+    private let jobTransport: AIGenerationJobTransport?
     private let maxSectionsCap = 50
     private let maxCardsPerSectionCap = 50
     private let maxFrontLength = 140
     private let maxBackLength = 220
 
-    init(transport: AIGenerationTransport) {
+    init(transport: AIGenerationTransport, jobTransport: AIGenerationJobTransport? = nil) {
         self.transport = transport
+        self.jobTransport = jobTransport ?? (transport as? AIGenerationJobTransport)
     }
 
     /// Generates a TopicPackDTO from a brief prompt and difficulty.
@@ -56,20 +74,88 @@ final class AIContentService {
         targetSections: Int = 3,
         targetCardsPerSection: Int = 5
     ) async throws -> TopicPackDTO {
-        let clampedSections = max(1, min(targetSections, maxSectionsCap))
-        let clampedCards = max(1, min(targetCardsPerSection, maxCardsPerSectionCap))
-
-        let prompt = buildPrompt(
+        let request = GenerationJobRequest(
             title: title,
             difficulty: difficulty,
             language: language,
-            sections: clampedSections,
-            cardsPerSection: clampedCards
+            targetSections: targetSections,
+            targetCardsPerSection: targetCardsPerSection
+        )
+        let clamped = clampedTargets(for: request)
+        let prompt = buildPrompt(
+            title: request.title,
+            difficulty: request.difficulty,
+            language: request.language,
+            sections: clamped.sections,
+            cardsPerSection: clamped.cards
         )
         Self.logger.debug(
-            "Starting generation: promptLength=\(prompt.count, privacy: .public) sections=\(clampedSections, privacy: .public) cardsPerSection=\(clampedCards, privacy: .public)"
+            "Starting generation: promptLength=\(prompt.count, privacy: .public) sections=\(clamped.sections, privacy: .public) cardsPerSection=\(clamped.cards, privacy: .public)"
         )
         let responseText = try await transport.generateText(prompt: prompt)
+        return try decodeTopicPack(from: responseText, clamped: clamped)
+    }
+
+    func startTopicPackGenerationJob(
+        title: String,
+        difficulty: Difficulty,
+        language: String = "en",
+        targetSections: Int = 3,
+        targetCardsPerSection: Int = 5
+    ) async throws -> GenerationJobHandle {
+        guard let jobTransport else {
+            throw ServiceError.jobTransportUnavailable
+        }
+
+        let request = GenerationJobRequest(
+            title: title,
+            difficulty: difficulty,
+            language: language,
+            targetSections: targetSections,
+            targetCardsPerSection: targetCardsPerSection
+        )
+        let clamped = clampedTargets(for: request)
+        let prompt = buildPrompt(
+            title: request.title,
+            difficulty: request.difficulty,
+            language: request.language,
+            sections: clamped.sections,
+            cardsPerSection: clamped.cards
+        )
+        let jobID = try await jobTransport.startGenerationJob(prompt: prompt)
+        Self.logger.debug(
+            "Started generation job: jobID=\(jobID.rawValue, privacy: .public) promptLength=\(prompt.count, privacy: .public) sections=\(clamped.sections, privacy: .public) cardsPerSection=\(clamped.cards, privacy: .public)"
+        )
+        return GenerationJobHandle(id: jobID, request: request)
+    }
+
+    func fetchTopicPackGenerationJobStatus(jobID: AIGenerationJobID) async throws -> AIGenerationJobStatus {
+        guard let jobTransport else {
+            throw ServiceError.jobTransportUnavailable
+        }
+        return try await jobTransport.fetchGenerationJobStatus(id: jobID)
+    }
+
+    func fetchTopicPackGenerationJobResult(handle: GenerationJobHandle) async throws -> TopicPackDTO {
+        guard let jobTransport else {
+            throw ServiceError.jobTransportUnavailable
+        }
+        let clamped = clampedTargets(for: handle.request)
+        let responseText = try await jobTransport.fetchGenerationJobResult(id: handle.id)
+        return try decodeTopicPack(from: responseText, clamped: clamped)
+    }
+
+    private func clampedTargets(for request: GenerationJobRequest) -> (sections: Int, cards: Int) {
+        (
+            sections: max(1, min(request.targetSections, maxSectionsCap)),
+            cards: max(1, min(request.targetCardsPerSection, maxCardsPerSectionCap))
+        )
+    }
+
+    private func decodeTopicPack(
+        from responseText: String,
+        clamped: (sections: Int, cards: Int)
+    ) throws -> TopicPackDTO {
         let rawPreview = self.preview(responseText)
         Self.logger.debug(
             "Received backend output: length=\(responseText.count, privacy: .public) preview=\(rawPreview, privacy: .public)"
@@ -80,17 +166,15 @@ final class AIContentService {
             "Normalized backend output: changed=\(normalizedText != responseText, privacy: .public) normalizedLength=\(normalizedText.count, privacy: .public) preview=\(self.preview(normalizedText), privacy: .public)"
         )
 
-        let contentData = normalizedText.data(using: .utf8)
-
-        guard let content = contentData else {
+        guard let content = normalizedText.data(using: .utf8) else {
             Self.logger.error("Failed to encode normalized output as UTF-8 data.")
             throw ServiceError.emptyResponse
         }
 
         return try decodeDTO(
             from: content,
-            maxSections: clampedSections,
-            maxCardsPerSection: clampedCards
+            maxSections: clamped.sections,
+            maxCardsPerSection: clamped.cards
         )
     }
 
