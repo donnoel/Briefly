@@ -58,6 +58,7 @@ struct GeneratedPackReviewView: View {
                     }
                 }
                 .disabled(isSaving)
+                .accessibilityIdentifier("generated.review.save")
             }
         }
     }

@@ -14,6 +14,7 @@ struct LibraryView: View {
     @State private var randomError: String?
     @State private var libraryError: String?
     @State private var libraryCompactHeaderVisible = false
+    @State private var cannedGeneratedReviewDTO: TopicPackDTO?
 
     var body: some View {
         List {
@@ -94,7 +95,11 @@ struct LibraryView: View {
                     }
 
                     Button {
-                        showingAIGenerator = true
+                        if ProcessInfo.processInfo.arguments.contains("-uiTestUseCannedGeneratedPack") {
+                            cannedGeneratedReviewDTO = Self.uiTestCannedGeneratedPack()
+                        } else {
+                            showingAIGenerator = true
+                        }
                     } label: {
                         Label("Generate", systemImage: "plus.circle")
                     }
@@ -144,6 +149,26 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(isPresented: $showingSettings)
+        }
+        .sheet(isPresented: Binding(
+            get: { cannedGeneratedReviewDTO != nil },
+            set: { isPresented in
+                if !isPresented {
+                    cannedGeneratedReviewDTO = nil
+                }
+            }
+        )) {
+            if let dto = cannedGeneratedReviewDTO {
+                NavigationStack {
+                    GeneratedPackReviewView(
+                        viewModel: GeneratedPackReviewViewModel(pack: dto),
+                        onSave: { editedDTO in
+                            await saveGeneratedReviewDTO(editedDTO)
+                        },
+                        originalDTO: dto
+                    )
+                }
+            }
         }
         .alert("Generation failed", isPresented: Binding(
             get: { randomError != nil },
@@ -620,6 +645,49 @@ struct LibraryView: View {
         viewModel.selectedCategory = nil
         viewModel.selectedDifficulty = nil
         viewModel.searchText = ""
+    }
+
+    private func saveGeneratedReviewDTO(_ dto: TopicPackDTO) async -> Bool {
+        do {
+            guard try await ContentRepository.shared.appendOrReplaceUserPack(dto) != nil else {
+                libraryError = "Edited content could not be parsed."
+                return false
+            }
+            cannedGeneratedReviewDTO = nil
+            return true
+        } catch {
+            libraryError = error.localizedDescription
+            return false
+        }
+    }
+
+    private static func uiTestCannedGeneratedPack() -> TopicPackDTO {
+        TopicPackDTO(
+            id: "ui_test_generated_pack",
+            title: "UI Canned Generated Pack",
+            subtitle: "Canned generated topic for UI smoke tests.",
+            category: "Generated",
+            difficulty: Difficulty.beginner.rawValue,
+            language: "en",
+            description: "Generated locally for deterministic review and save coverage.",
+            author: nil,
+            version: "1",
+            sections: [
+                TopicSectionDTO(
+                    id: "ui_test_generated_section_1",
+                    title: "Canned Review Section",
+                    cards: [
+                        CardDTO(
+                            id: "ui_test_generated_card_1",
+                            front: "What does this smoke test prove?",
+                            back: "A generated pack can be reviewed and saved without network access.",
+                            source: nil,
+                            tags: nil
+                        )
+                    ]
+                )
+            ]
+        )
     }
 
     private func openTopic(_ topic: TopicPack) {

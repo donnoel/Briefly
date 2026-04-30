@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5A9B00012EF3A00000A91A6 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9B00002EF3A00000A91A6 /* AppIntents.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		5A2FD3452EDCCA09006A91A6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		5A2FD3332EDCCA08006A91A6 /* Briefly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Briefly.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A2FD3442EDCCA09006A91A6 /* BrieflyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BrieflyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A2FD34E2EDCCA09006A91A6 /* BrieflyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BrieflyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A9B00002EF3A00000A91A6 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -65,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A9B00012EF3A00000A91A6 /* AppIntents.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +97,7 @@
 				5A2FD3352EDCCA08006A91A6 /* Briefly */,
 				5A2FD3472EDCCA09006A91A6 /* BrieflyTests */,
 				5A2FD3512EDCCA09006A91A6 /* BrieflyUITests */,
+				5A9B00002EF3A00000A91A6 /* AppIntents.framework */,
 				5A2FD3342EDCCA08006A91A6 /* Products */,
 			);
 			sourceTree = "<group>";

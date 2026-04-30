@@ -113,6 +113,45 @@ final class BrieflyUITests: XCTestCase {
     }
 
     @MainActor
+    func testCannedGeneratedPackCanBeReviewedSavedAndReloaded() throws {
+        let generatedTitle = "UI Canned Generated Pack"
+        var app = makeSeededApp(resetState: true, useCannedGeneratedPack: true)
+        app.launch()
+
+        openGenerationSheet(in: app)
+
+        XCTAssertTrue(
+            app.staticTexts["Review & Edit"].waitForExistence(timeout: 5),
+            "Expected canned generation to open review without waiting on the network."
+        )
+        XCTAssertTrue(
+            app.textFields[generatedTitle].waitForExistence(timeout: 5),
+            "Expected review UI to contain the canned generated pack title."
+        )
+
+        let saveButton = app.buttons["generated.review.save"].firstMatch
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "Expected review UI to expose the save action.")
+        saveButton.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)[generatedTitle].waitForExistence(timeout: 10),
+            "Expected saved generated pack to appear in the library."
+        )
+
+        app.terminate()
+
+        app = makeSeededApp(useCannedGeneratedPack: true)
+        app.launch()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)[generatedTitle].waitForExistence(timeout: 20),
+            "Expected saved generated pack to persist after relaunch."
+        )
+
+        app.terminate()
+    }
+
+    @MainActor
     private func runStudyFlow(in app: XCUIApplication) {
         app.swipeUp()
         app.swipeDown()
@@ -140,6 +179,17 @@ final class BrieflyUITests: XCTestCase {
     }
 
     @MainActor
+    private func openGenerationSheet(in app: XCUIApplication) {
+        let libraryMenu = app.buttons["Models, filters, and generate"].firstMatch
+        XCTAssertTrue(libraryMenu.waitForExistence(timeout: 20), "Expected library generation menu to appear.")
+        libraryMenu.tap()
+
+        let generateButton = app.buttons["Generate"].firstMatch
+        XCTAssertTrue(generateButton.waitForExistence(timeout: 5), "Expected generation command in library menu.")
+        generateButton.tap()
+    }
+
+    @MainActor
     private func finishCurrentSection(in app: XCUIApplication) {
         let seeAnswerButton = app.buttons["See answer"].firstMatch
         XCTAssertTrue(seeAnswerButton.waitForExistence(timeout: 5), "Expected deck screen to show the answer reveal action.")
@@ -162,11 +212,14 @@ final class BrieflyUITests: XCTestCase {
         makeSeededApp()
     }
 
-    private func makeSeededApp(resetState: Bool = false) -> XCUIApplication {
+    private func makeSeededApp(resetState: Bool = false, useCannedGeneratedPack: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-uiTestSeedTopic", "-uiTestDisableCloudSync"]
         if resetState {
             app.launchArguments += ["-uiTestResetState"]
+        }
+        if useCannedGeneratedPack {
+            app.launchArguments += ["-uiTestUseCannedGeneratedPack"]
         }
         return app
     }
