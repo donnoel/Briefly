@@ -28,6 +28,7 @@ struct AIGenerationJobRequestPayload: Codable, Equatable {
     let language: String
     let targetSections: Int
     let targetCardsPerSection: Int
+    let model: String?
 }
 
 protocol AIGenerationJobTransport {

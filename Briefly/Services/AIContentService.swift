@@ -121,7 +121,8 @@ final class AIContentService {
             difficulty: request.difficulty.rawValue,
             language: request.language,
             targetSections: clamped.sections,
-            targetCardsPerSection: clamped.cards
+            targetCardsPerSection: clamped.cards,
+            model: ModelPreferenceStore.shared.preferredModel ?? OpenAIModelCatalog.defaultModel
         )
 
         let jobID = try await jobTransport.startGenerationJob(request: payload)

@@ -90,7 +90,7 @@ struct LibraryView: View {
                     Button {
                         showingSettings = true
                     } label: {
-                        Label("Settings", systemImage: "gearshape")
+                        Label("Models", systemImage: "gearshape")
                     }
 
                     Button {
@@ -129,13 +129,9 @@ struct LibraryView: View {
                         .disabled(!hasActiveFilters)
                     }
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "gearshape")
-                        Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        Image(systemName: "plus.circle")
-                    }
+                    Image(systemName: "plus.circle")
                 }
-                .accessibilityLabel("Settings, filters, and generate")
+                .accessibilityLabel("Models, filters, and generate")
             }
         }
         .searchable(
