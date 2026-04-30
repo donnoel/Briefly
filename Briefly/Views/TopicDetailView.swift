@@ -250,6 +250,7 @@ struct TopicDetailView: View {
 
     private func sectionCard(_ section: TopicSection) -> some View {
         let completed = viewModel.isSectionCompleted(section)
+        let canStudy = viewModel.canStudy(section)
 
         return Button {
             coordinator.showDeck(for: viewModel.topic, section: section)
@@ -269,7 +270,10 @@ struct TopicDetailView: View {
 
                     HStack(spacing: 8) {
                         sectionStat(title: "\(section.cards.count) cards", icon: "rectangle.stack.fill")
-                        sectionStat(title: completed ? "Review again" : "Ready to study", icon: completed ? "arrow.clockwise" : "play.fill")
+                        sectionStat(
+                            title: sectionStudyStatusTitle(completed: completed, canStudy: canStudy),
+                            icon: sectionStudyStatusIcon(completed: completed, canStudy: canStudy)
+                        )
                     }
                 }
 
@@ -280,6 +284,10 @@ struct TopicDetailView: View {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.title3)
                             .foregroundColor(.green)
+                    } else if !canStudy {
+                        Image(systemName: "exclamationmark.circle")
+                            .font(.title3)
+                            .foregroundColor(BrieflyTheme.Colors.textSecondary)
                     } else {
                         Image(systemName: "sparkles")
                             .font(.title3)
@@ -296,7 +304,19 @@ struct TopicDetailView: View {
             .background(sectionCardBackground(completed: completed))
         }
         .buttonStyle(InteractiveCardButtonStyle())
+        .disabled(!canStudy)
+        .opacity(canStudy ? 1 : 0.72)
         .accessibilityIdentifier("topic.section.card")
+    }
+
+    private func sectionStudyStatusTitle(completed: Bool, canStudy: Bool) -> String {
+        guard canStudy else { return "No cards yet" }
+        return completed ? "Review again" : "Ready to study"
+    }
+
+    private func sectionStudyStatusIcon(completed: Bool, canStudy: Bool) -> String {
+        guard canStudy else { return "exclamationmark.circle" }
+        return completed ? "arrow.clockwise" : "play.fill"
     }
 
     private func sectionCardBackground(completed: Bool) -> some View {

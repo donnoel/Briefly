@@ -247,6 +247,42 @@ struct ContentRepositoryTests {
         #expect(title == "Neuroscience Curiosities")
     }
 
+    @Test
+    func topicDetailTreatsEmptySectionsAsNotStudyable() {
+        let topic = makeTopic(
+            id: "empty_section_topic",
+            sections: [
+                TopicSection(id: "empty", title: "Empty", cards: []),
+                TopicSection(id: "ready", title: "Ready", cards: [
+                    Card(id: "ready_card", front: "Question", back: "Answer")
+                ])
+            ]
+        )
+        let viewModel = TopicDetailViewModel(
+            topic: topic,
+            progressStore: ProgressStore(defaults: makeIsolatedDefaults())
+        )
+
+        #expect(!viewModel.canStudy(topic.sections[0]))
+        #expect(viewModel.canStudy(topic.sections[1]))
+    }
+
+    @Test
+    func coordinatorDoesNotNavigateToEmptySectionDeck() {
+        let emptySection = TopicSection(id: "empty", title: "Empty", cards: [])
+        let readySection = TopicSection(id: "ready", title: "Ready", cards: [
+            Card(id: "ready_card", front: "Question", back: "Answer")
+        ])
+        let topic = makeTopic(id: "guarded_topic", sections: [emptySection, readySection])
+        let coordinator = AppCoordinator()
+
+        coordinator.showDeck(for: topic, section: emptySection)
+        #expect(coordinator.path.isEmpty)
+
+        coordinator.showDeck(for: topic, section: readySection)
+        #expect(coordinator.path == [.deck(topic, readySection)])
+    }
+
     private func makeRepository(
         disk: InMemoryDiskStore,
         defaults: UserDefaults,
@@ -305,6 +341,21 @@ struct ContentRepositoryTests {
                     ]
                 )
             ]
+        )
+    }
+
+    private func makeTopic(
+        id: String,
+        title: String = "Topic",
+        sections: [TopicSection]
+    ) -> TopicPack {
+        TopicPack(
+            id: id,
+            title: title,
+            subtitle: "Subtitle",
+            category: "General",
+            difficulty: .beginner,
+            sections: sections
         )
     }
 }

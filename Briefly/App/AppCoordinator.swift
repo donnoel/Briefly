@@ -16,6 +16,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     func showDeck(for topic: TopicPack, section: TopicSection) {
+        guard !section.cards.isEmpty else { return }
         path.append(.deck(topic, section))
     }
 

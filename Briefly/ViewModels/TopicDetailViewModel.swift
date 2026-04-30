@@ -26,4 +26,8 @@ final class TopicDetailViewModel: ObservableObject {
     func isSectionCompleted(_ section: TopicSection) -> Bool {
         progressStore.isSectionCompleted(section)
     }
+
+    func canStudy(_ section: TopicSection) -> Bool {
+        !section.cards.isEmpty
+    }
 }

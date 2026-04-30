@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		5A9B00012EF3A00000A91A6 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9B00002EF3A00000A91A6 /* AppIntents.framework */; };
+		5A9B00022EF3A00000A91A6 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9B00002EF3A00000A91A6 /* AppIntents.framework */; };
+		5A9B00032EF3A00000A91A6 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A9B00002EF3A00000A91A6 /* AppIntents.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +80,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A9B00022EF3A00000A91A6 /* AppIntents.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +88,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A9B00032EF3A00000A91A6 /* AppIntents.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
