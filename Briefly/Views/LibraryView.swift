@@ -96,7 +96,7 @@ struct LibraryView: View {
                     Button {
                         showingAIGenerator = true
                     } label: {
-                        Label("Generate", systemImage: "sparkles")
+                        Label("Generate", systemImage: "plus.circle")
                     }
 
                     Section("Filters") {
@@ -132,7 +132,7 @@ struct LibraryView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "gearshape")
                         Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        Image(systemName: "sparkles")
+                        Image(systemName: "plus.circle")
                     }
                 }
                 .accessibilityLabel("Settings, filters, and generate")
