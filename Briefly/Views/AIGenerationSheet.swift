@@ -172,6 +172,7 @@ struct AIGenerationSheet: View {
 
         let backendClient = BrieflyBackendClient()
         let service = AIContentService(transport: backendClient, jobTransport: backendClient)
+        let poller = AIGenerationJobPoller(service: service)
 
         generationTask = Task {
             do {
@@ -187,41 +188,24 @@ struct AIGenerationSheet: View {
                     "Fresh Topics job created: jobID=\(handle.id.rawValue, privacy: .public) title=\(trimmedTitle, privacy: .public)"
                 )
 
-                await MainActor.run {
-                    progressFraction = 0.1
-                    progressText = "Job started…"
-                }
-
-                while true {
+                let stream = await poller.updates(handle: handle)
+                for try await update in stream {
                     try Task.checkCancellation()
-
-                    let status = try await service.fetchTopicPackGenerationJobStatus(jobID: handle.id)
-
-                    switch status.state {
-                    case .queued:
-                        Self.logger.debug("Fresh Topics job queued: jobID=\(handle.id.rawValue, privacy: .public)")
-                        await MainActor.run {
+                    await MainActor.run {
+                        switch update {
+                        case .started:
+                            progressFraction = max(progressFraction, 0.10)
+                            progressText = "Job started…"
+                        case .queued:
                             progressFraction = max(progressFraction, 0.15)
                             progressText = "Queued…"
-                        }
-
-                    case .running:
-                        Self.logger.debug("Fresh Topics job running: jobID=\(handle.id.rawValue, privacy: .public)")
-                        await MainActor.run {
-                            progressFraction = min(max(progressFraction, 0.2) + 0.1, 0.9)
+                        case .running(_, let fraction):
+                            progressFraction = max(progressFraction, fraction)
                             progressText = "Generating…"
-                        }
-
-                    case .completed:
-                        Self.logger.debug("Fresh Topics job completed: jobID=\(handle.id.rawValue, privacy: .public)")
-                        await MainActor.run {
-                            progressFraction = 0.95
+                        case .finalizing:
+                            progressFraction = max(progressFraction, 0.95)
                             progressText = "Finalizing…"
-                        }
-
-                        let dto = try await service.fetchTopicPackGenerationJobResult(handle: handle)
-
-                        await MainActor.run {
+                        case .completed(_, let dto):
                             pendingDTO = dto
                             isGenerating = false
                             progressFraction = 1.0
@@ -229,16 +213,7 @@ struct AIGenerationSheet: View {
                             showingReview = true
                             generationTask = nil
                         }
-                        return
-
-                    case .failed(let reason):
-                        Self.logger.error(
-                            "Fresh Topics job failed: jobID=\(handle.id.rawValue, privacy: .public) reason=\(reason, privacy: .public)"
-                        )
-                        throw BrieflyBackendClient.ClientError.jobFailed(reason: reason)
                     }
-
-                    try await Task.sleep(nanoseconds: 1_000_000_000)
                 }
             } catch is CancellationError {
                 Self.logger.debug("Fresh Topics generation cancelled")
