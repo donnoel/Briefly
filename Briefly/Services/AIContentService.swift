@@ -115,16 +115,18 @@ final class AIContentService {
             targetCardsPerSection: targetCardsPerSection
         )
         let clamped = clampedTargets(for: request)
-        let prompt = buildPrompt(
+
+        let payload = AIGenerationJobRequestPayload(
             title: request.title,
-            difficulty: request.difficulty,
+            difficulty: request.difficulty.rawValue,
             language: request.language,
-            sections: clamped.sections,
-            cardsPerSection: clamped.cards
+            targetSections: clamped.sections,
+            targetCardsPerSection: clamped.cards
         )
-        let jobID = try await jobTransport.startGenerationJob(prompt: prompt)
+
+        let jobID = try await jobTransport.startGenerationJob(request: payload)
         Self.logger.debug(
-            "Started generation job: jobID=\(jobID.rawValue, privacy: .public) promptLength=\(prompt.count, privacy: .public) sections=\(clamped.sections, privacy: .public) cardsPerSection=\(clamped.cards, privacy: .public)"
+            "Started generation job: jobID=\(jobID.rawValue, privacy: .public) title=\(request.title, privacy: .public) sections=\(clamped.sections, privacy: .public) cardsPerSection=\(clamped.cards, privacy: .public)"
         )
         return GenerationJobHandle(id: jobID, request: request)
     }

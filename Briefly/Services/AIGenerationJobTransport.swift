@@ -22,8 +22,16 @@ struct AIGenerationJobStatus: Equatable {
     let state: AIGenerationJobState
 }
 
+struct AIGenerationJobRequestPayload: Codable, Equatable {
+    let title: String
+    let difficulty: String
+    let language: String
+    let targetSections: Int
+    let targetCardsPerSection: Int
+}
+
 protocol AIGenerationJobTransport {
-    func startGenerationJob(prompt: String) async throws -> AIGenerationJobID
+    func startGenerationJob(request: AIGenerationJobRequestPayload) async throws -> AIGenerationJobID
     func fetchGenerationJobStatus(id: AIGenerationJobID) async throws -> AIGenerationJobStatus
     func fetchGenerationJobResult(id: AIGenerationJobID) async throws -> String
 }

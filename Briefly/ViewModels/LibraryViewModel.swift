@@ -181,7 +181,7 @@ final class LibraryViewModel: ObservableObject {
             "philosophy sparks",
             "design thinking"
         ]
-        // Pick a subject the user doesn't already have. If all are taken, synthesize a new one.
+
         let subject: String = {
             let unseenSubjects = subjects.filter { !existingTitles.contains($0.lowercased()) }
             if let candidate = unseenSubjects.randomElement() {
@@ -189,121 +189,111 @@ final class LibraryViewModel: ObservableObject {
             }
             return Self.synthesizedSubject(existingTitles: existingTitles)
         }()
-        let requestedTitle = subject.capitalized
 
+        let requestedTitle = subject.capitalized
         let difficulty = Difficulty.allCases.randomElement() ?? .beginner
 
-        let service = AIContentService(transport: BrieflyBackendClient())
+        let backendClient = BrieflyBackendClient()
+        let service = AIContentService(transport: backendClient, jobTransport: backendClient)
+
         Self.logger.debug(
             "Surprise Me start: requestedTitle=\(requestedTitle, privacy: .public) targetSections=\(targetSections, privacy: .public) cardsPerSection=\(cardsPerSection, privacy: .public)"
         )
 
-        // Progressive strategy: request sections in two smaller batches, then merge.
-        let perRequestSectionsCap = AIContentService.RequestSizing.preferredMaxSectionsPerRequest
-        let perRequestCards = AIContentService.RequestSizing.cardsPerSection(for: cardsPerSection)
-        let firstTarget = min(targetSections, perRequestSectionsCap)
-        let secondTarget = max(targetSections - firstTarget, 0)
-        Self.logger.debug(
-            "Surprise Me request plan: firstSections=\(firstTarget, privacy: .public) secondSections=\(secondTarget, privacy: .public) requestedCardsPerSection=\(cardsPerSection, privacy: .public) effectiveCardsPerSection=\(perRequestCards, privacy: .public)"
-        )
-
-        Self.logger.debug("Surprise Me first request start")
-        let firstDTO: TopicPackDTO
+        let handle: AIContentService.GenerationJobHandle
         do {
-            firstDTO = try await service.generateTopicPack(
+            handle = try await service.startTopicPackGenerationJob(
                 title: requestedTitle,
                 difficulty: difficulty,
                 language: "en",
-                targetSections: firstTarget,
-                targetCardsPerSection: perRequestCards
+                targetSections: targetSections,
+                targetCardsPerSection: cardsPerSection
             )
-            let firstCounts = SurpriseMeAssembly.dtoCounts(firstDTO)
             Self.logger.debug(
-                "Surprise Me first request complete: sections=\(firstCounts.sections, privacy: .public) cards=\(firstCounts.cards, privacy: .public)"
+                "Surprise Me job created: jobID=\(handle.id.rawValue, privacy: .public) title=\(requestedTitle, privacy: .public)"
             )
         } catch {
-            logSurpriseMeError(error, stage: "first request")
+            logSurpriseMeError(error, stage: "job create")
             throw error
         }
 
-        let secondDTO: TopicPackDTO?
-        if secondTarget > 0 {
-            Self.logger.debug("Surprise Me second request start")
+        while true {
+            let status: AIGenerationJobStatus
             do {
-                let dto = try await service.generateTopicPack(
-                    title: requestedTitle,
-                    difficulty: difficulty,
-                    language: "en",
-                    targetSections: secondTarget,
-                    targetCardsPerSection: perRequestCards
-                )
-                let secondCounts = SurpriseMeAssembly.dtoCounts(dto)
-                Self.logger.debug(
-                    "Surprise Me second request complete: sections=\(secondCounts.sections, privacy: .public) cards=\(secondCounts.cards, privacy: .public)"
-                )
-                secondDTO = dto
+                status = try await service.fetchTopicPackGenerationJobStatus(jobID: handle.id)
             } catch {
-                logSurpriseMeError(error, stage: "second request")
+                logSurpriseMeError(error, stage: "job status")
                 throw error
             }
-        } else {
-            secondDTO = nil
-        }
 
-        // Choose the final pack ID/title before normalizing IDs to avoid collisions.
-        let uniqueBase = makeUnique(dto: firstDTO, existingIDs: existingIDs, existingTitles: existingTitles)
-        let baseID = uniqueBase.id
-        let sanitizedTitle = Self.sanitizedRandomTopicTitle(
-            generatedTitle: uniqueBase.title,
-            requestedTitle: requestedTitle
-        )
-        let baseTitle = Self.makeUniqueTitle(base: sanitizedTitle, existingTitles: existingTitles)
+            switch status.state {
+            case .queued:
+                Self.logger.debug("Surprise Me job queued: jobID=\(handle.id.rawValue, privacy: .public)")
 
-        var normalizedBase = normalize(
-            dto: uniqueBase,
-            baseID: baseID,
-            baseTitle: baseTitle,
-            sectionStartIndex: 0
-        )
-        let normalizedBaseCounts = SurpriseMeAssembly.dtoCounts(normalizedBase)
-        Self.logger.debug(
-            "Surprise Me base normalized: id=\(normalizedBase.id, privacy: .public) title=\(normalizedBase.title, privacy: .public) sections=\(normalizedBaseCounts.sections, privacy: .public) cards=\(normalizedBaseCounts.cards, privacy: .public)"
-        )
+            case .running:
+                Self.logger.debug("Surprise Me job running: jobID=\(handle.id.rawValue, privacy: .public)")
 
-        if let secondDTO {
-            Self.logger.debug("Surprise Me merge start")
-            let normalizedSecond = normalize(
-                dto: secondDTO,
-                baseID: baseID,
-                baseTitle: baseTitle,
-                sectionStartIndex: normalizedBase.sections.count
-            )
-            normalizedBase = mergeSections(into: normalizedBase, additionalSections: normalizedSecond.sections)
-            let normalizedSecondCounts = SurpriseMeAssembly.dtoCounts(normalizedSecond)
-            let mergedCounts = SurpriseMeAssembly.dtoCounts(normalizedBase)
-            Self.logger.debug(
-                "Surprise Me merge complete: secondSections=\(normalizedSecondCounts.sections, privacy: .public) secondCards=\(normalizedSecondCounts.cards, privacy: .public) mergedSections=\(mergedCounts.sections, privacy: .public) mergedCards=\(mergedCounts.cards, privacy: .public)"
-            )
-        }
+            case .completed:
+                Self.logger.debug("Surprise Me job completed: jobID=\(handle.id.rawValue, privacy: .public)")
 
-        Self.logger.debug("Surprise Me final validation start")
-        guard normalizedBase.isValid() else {
-            let reason = SurpriseMeAssembly.validationFailureReason(for: normalizedBase)
-            Self.logger.error("Surprise Me final DTO invalid: \(reason, privacy: .public)")
-            throw AIContentService.ServiceError.validationFailed(details: reason)
-        }
-        Self.logger.debug("Surprise Me final validation success")
+                let dto: TopicPackDTO
+                do {
+                    dto = try await service.fetchTopicPackGenerationJobResult(handle: handle)
+                    let dtoCounts = SurpriseMeAssembly.dtoCounts(dto)
+                    Self.logger.debug(
+                        "Surprise Me job result fetched: sections=\(dtoCounts.sections, privacy: .public) cards=\(dtoCounts.cards, privacy: .public)"
+                    )
+                } catch {
+                    logSurpriseMeError(error, stage: "job result")
+                    throw error
+                }
 
-        Self.logger.debug("Surprise Me persistence start")
-        do {
-            let persisted = try await contentRepository.appendOrReplaceUserPack(normalizedBase)
-            Self.logger.debug("Surprise Me persistence success")
-            return persisted
-        } catch {
-            Self.logger.error(
-                "Surprise Me persistence failed: classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
-            )
-            throw error
+                let uniqueBase = makeUnique(dto: dto, existingIDs: existingIDs, existingTitles: existingTitles)
+                let baseID = uniqueBase.id
+                let sanitizedTitle = Self.sanitizedRandomTopicTitle(
+                    generatedTitle: uniqueBase.title,
+                    requestedTitle: requestedTitle
+                )
+                let baseTitle = Self.makeUniqueTitle(base: sanitizedTitle, existingTitles: existingTitles)
+
+                let normalizedDTO = normalize(
+                    dto: uniqueBase,
+                    baseID: baseID,
+                    baseTitle: baseTitle,
+                    sectionStartIndex: 0
+                )
+                let normalizedCounts = SurpriseMeAssembly.dtoCounts(normalizedDTO)
+                Self.logger.debug(
+                    "Surprise Me normalized: id=\(normalizedDTO.id, privacy: .public) title=\(normalizedDTO.title, privacy: .public) sections=\(normalizedCounts.sections, privacy: .public) cards=\(normalizedCounts.cards, privacy: .public)"
+                )
+
+                Self.logger.debug("Surprise Me final validation start")
+                guard normalizedDTO.isValid() else {
+                    let reason = SurpriseMeAssembly.validationFailureReason(for: normalizedDTO)
+                    Self.logger.error("Surprise Me final DTO invalid: \(reason, privacy: .public)")
+                    throw AIContentService.ServiceError.validationFailed(details: reason)
+                }
+                Self.logger.debug("Surprise Me final validation success")
+
+                Self.logger.debug("Surprise Me persistence start")
+                do {
+                    let persisted = try await contentRepository.appendOrReplaceUserPack(normalizedDTO)
+                    Self.logger.debug("Surprise Me persistence success")
+                    return persisted
+                } catch {
+                    Self.logger.error(
+                        "Surprise Me persistence failed: classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
+                    )
+                    throw error
+                }
+
+            case .failed(let reason):
+                let error = BrieflyBackendClient.ClientError.jobFailed(reason: reason)
+                logSurpriseMeError(error, stage: "job failed")
+                throw error
+            }
+
+            try await Task.sleep(nanoseconds: 1_000_000_000)
         }
     }
 
@@ -464,21 +454,6 @@ final class LibraryViewModel: ObservableObject {
             author: dto.author,
             version: dto.version,
             sections: normalized.sections
-        )
-    }
-
-    private func mergeSections(into dto: TopicPackDTO, additionalSections: [TopicSectionDTO]) -> TopicPackDTO {
-        TopicPackDTO(
-            id: dto.id,
-            title: dto.title,
-            subtitle: dto.subtitle,
-            category: dto.category,
-            difficulty: dto.difficulty,
-            language: dto.language,
-            description: dto.description,
-            author: dto.author,
-            version: dto.version,
-            sections: dto.sections + additionalSections
         )
     }
 

@@ -28,6 +28,7 @@ struct AIGenerationSheet: View {
                         VStack(alignment: .leading, spacing: 10) {
                             ProgressView(value: progressFraction)
                                 .tint(BrieflyTheme.Colors.accent)
+
                             HStack {
                                 Text(progressText ?? "Generating…")
                                     .font(.subheadline.weight(.semibold))
@@ -37,9 +38,11 @@ struct AIGenerationSheet: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundColor(.secondary)
                             }
+
                             Text("Keep this sheet open while we build your topic.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+
                             Button(role: .destructive) {
                                 cancelGeneration()
                             } label: {
@@ -73,6 +76,7 @@ struct AIGenerationSheet: View {
                 Section("Topic") {
                     TextField("Title or concept", text: $title)
                         .disabled(isGenerating)
+
                     Picker("Difficulty", selection: $difficulty) {
                         ForEach(Difficulty.allCases, id: \.self) { level in
                             Text(level.rawValue).tag(level)
@@ -86,6 +90,7 @@ struct AIGenerationSheet: View {
                         Text("Sections: \(targetSections)")
                     }
                     .disabled(isGenerating)
+
                     Stepper(value: $targetCardsPerSection, in: 1...50) {
                         Text("Cards per section: \(targetCardsPerSection)")
                     }
@@ -154,6 +159,7 @@ struct AIGenerationSheet: View {
     private func generate() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
+
         Self.logger.debug(
             "Fresh Topics generation start: title=\(trimmedTitle, privacy: .public) targetSections=\(targetSections, privacy: .public) cardsPerSection=\(targetCardsPerSection, privacy: .public)"
         )
@@ -163,117 +169,76 @@ struct AIGenerationSheet: View {
         progressFraction = 0
         progressText = "Starting…"
         cancelGeneration(resetUI: false)
-        let service = AIContentService(transport: BrieflyBackendClient())
+
+        let backendClient = BrieflyBackendClient()
+        let service = AIContentService(transport: backendClient, jobTransport: backendClient)
 
         generationTask = Task {
             do {
-                let batchSize = max(1, min(targetSections, 5))
-                let perRequestSections = AIContentService.RequestSizing.sectionsPerRequest(for: batchSize)
-                let perRequestCards = AIContentService.RequestSizing.cardsPerSection(for: targetCardsPerSection)
-                if perRequestCards != targetCardsPerSection || perRequestSections != batchSize {
-                    Self.logger.debug(
-                        "Fresh Topics workload tuned for latency: requestedSectionsPerBatch=\(batchSize, privacy: .public) effectiveSectionsPerBatch=\(perRequestSections, privacy: .public) requestedCardsPerSection=\(targetCardsPerSection, privacy: .public) effectiveCardsPerSection=\(perRequestCards, privacy: .public)"
-                    )
-                }
-                let totalBatches = max(1, Int(ceil(Double(targetSections) / Double(perRequestSections))))
-
-                var aggregatedSections: [TopicSectionDTO] = []
-                var baseDTO: TopicPackDTO?
-                var sectionCounter = 0
-
-                for batch in 0..<totalBatches {
-                    try Task.checkCancellation()
-                    let remaining = targetSections - aggregatedSections.count
-                    let requestSections = max(1, min(perRequestSections, remaining))
-                    Self.logger.debug(
-                        "Fresh Topics batch \(batch + 1, privacy: .public)/\(totalBatches, privacy: .public) start: requestSections=\(requestSections, privacy: .public) requestCardsPerSection=\(perRequestCards, privacy: .public) currentAggregatedSections=\(aggregatedSections.count, privacy: .public)"
-                    )
-
-                    let dto: TopicPackDTO
-                    do {
-                        dto = try await service.generateTopicPack(
-                            title: trimmedTitle,
-                            difficulty: difficulty,
-                            language: language,
-                            targetSections: requestSections,
-                            targetCardsPerSection: perRequestCards
-                        )
-                    } catch {
-                        Self.logger.error(
-                            "Fresh Topics batch \(batch + 1, privacy: .public) failed: classification=\(errorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
-                        )
-                        throw error
-                    }
-
-                    if baseDTO == nil {
-                        baseDTO = dto
-                        Self.logger.debug(
-                            "Fresh Topics base DTO selected: id=\(dto.id, privacy: .public) title=\(dto.title, privacy: .public) category=\(dto.category, privacy: .public) difficulty=\(dto.difficulty, privacy: .public)"
-                        )
-                    }
-                    let baseID = baseDTO?.id ?? dto.id
-                    let assembly = FreshTopicsAssembly.appendSections(
-                        from: dto,
-                        baseID: baseID,
-                        into: &aggregatedSections,
-                        targetSections: targetSections,
-                        sectionCounter: &sectionCounter
-                    )
-                    let returnedCardCount = dto.sections.reduce(0) { $0 + $1.cards.count }
-                    Self.logger.debug(
-                        "Fresh Topics batch \(batch + 1, privacy: .public) complete: returnedSections=\(dto.sections.count, privacy: .public) returnedCards=\(returnedCardCount, privacy: .public) addedSections=\(assembly.addedSections, privacy: .public) addedCards=\(assembly.addedCards, privacy: .public) droppedEmptySections=\(assembly.droppedEmptySections, privacy: .public) aggregatedSections=\(aggregatedSections.count, privacy: .public)"
-                    )
-
-                    await MainActor.run {
-                        guard !Task.isCancelled else { return }
-                        progressFraction = Double(batch + 1) / Double(totalBatches)
-                        progressText = "Generating batch \(batch + 1) of \(totalBatches)…"
-                    }
-                }
-
-                guard let base = baseDTO else {
-                    throw AIContentService.ServiceError.validationFailed(details: "missing base DTO from generation")
-                }
-
-                let finalDTO = TopicPackDTO(
-                    id: base.id,
-                    title: base.title,
-                    subtitle: base.subtitle,
-                    category: base.category,
-                    difficulty: base.difficulty,
-                    language: base.language,
-                    description: base.description,
-                    author: base.author,
-                    version: base.version,
-                    sections: aggregatedSections
+                let handle = try await service.startTopicPackGenerationJob(
+                    title: trimmedTitle,
+                    difficulty: difficulty,
+                    language: language,
+                    targetSections: targetSections,
+                    targetCardsPerSection: targetCardsPerSection
                 )
-                let finalCardCount = finalDTO.sections.reduce(0) { $0 + $1.cards.count }
+
                 Self.logger.debug(
-                    "Fresh Topics final assembly: sections=\(finalDTO.sections.count, privacy: .public) cards=\(finalCardCount, privacy: .public)"
+                    "Fresh Topics job created: jobID=\(handle.id.rawValue, privacy: .public) title=\(trimmedTitle, privacy: .public)"
                 )
 
-                Self.logger.debug("Fresh Topics final validation start")
-                guard finalDTO.isValid() else {
-                    let reason = FreshTopicsAssembly.validationFailureReason(for: finalDTO)
-                    Self.logger.error("Fresh Topics final DTO invalid: \(reason, privacy: .public)")
-                    await MainActor.run {
-                        isGenerating = false
-                        progressText = nil
-                        errorMessage = "Generated content was incomplete. Try again."
-                    }
-                    return
+                await MainActor.run {
+                    progressFraction = 0.1
+                    progressText = "Job started…"
                 }
-                Self.logger.debug("Fresh Topics final validation success")
 
-                await MainActor.run {
-                    guard !Task.isCancelled else { return }
-                    pendingDTO = finalDTO
-                    isGenerating = false
-                    progressText = nil
-                    showingReview = true
-                }
-                await MainActor.run {
-                    generationTask = nil
+                while true {
+                    try Task.checkCancellation()
+
+                    let status = try await service.fetchTopicPackGenerationJobStatus(jobID: handle.id)
+
+                    switch status.state {
+                    case .queued:
+                        Self.logger.debug("Fresh Topics job queued: jobID=\(handle.id.rawValue, privacy: .public)")
+                        await MainActor.run {
+                            progressFraction = max(progressFraction, 0.15)
+                            progressText = "Queued…"
+                        }
+
+                    case .running:
+                        Self.logger.debug("Fresh Topics job running: jobID=\(handle.id.rawValue, privacy: .public)")
+                        await MainActor.run {
+                            progressFraction = min(max(progressFraction, 0.2) + 0.1, 0.9)
+                            progressText = "Generating…"
+                        }
+
+                    case .completed:
+                        Self.logger.debug("Fresh Topics job completed: jobID=\(handle.id.rawValue, privacy: .public)")
+                        await MainActor.run {
+                            progressFraction = 0.95
+                            progressText = "Finalizing…"
+                        }
+
+                        let dto = try await service.fetchTopicPackGenerationJobResult(handle: handle)
+
+                        await MainActor.run {
+                            pendingDTO = dto
+                            isGenerating = false
+                            progressFraction = 1.0
+                            progressText = nil
+                            showingReview = true
+                            generationTask = nil
+                        }
+                        return
+
+                    case .failed(let reason):
+                        Self.logger.error(
+                            "Fresh Topics job failed: jobID=\(handle.id.rawValue, privacy: .public) reason=\(reason, privacy: .public)"
+                        )
+                        throw BrieflyBackendClient.ClientError.jobFailed(reason: reason)
+                    }
+
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
                 }
             } catch is CancellationError {
                 Self.logger.debug("Fresh Topics generation cancelled")
@@ -331,6 +296,7 @@ struct AIGenerationSheet: View {
                 return "job_transport_unavailable"
             }
         }
+
         if let clientError = error as? BrieflyBackendClient.ClientError {
             switch clientError {
             case .badResponse:
@@ -349,77 +315,11 @@ struct AIGenerationSheet: View {
                 return "job_failed"
             }
         }
+
         if error is ContentRepository.RepositoryError {
             return "persistence_failure"
         }
+
         return "unknown"
-    }
-}
-
-enum FreshTopicsAssembly {
-    struct AppendResult {
-        let addedSections: Int
-        let addedCards: Int
-        let droppedEmptySections: Int
-    }
-
-    static func appendSections(
-        from dto: TopicPackDTO,
-        baseID: String,
-        into aggregatedSections: inout [TopicSectionDTO],
-        targetSections: Int,
-        sectionCounter: inout Int
-    ) -> AppendResult {
-        var addedSections = 0
-        var addedCards = 0
-        var droppedEmptySections = 0
-
-        for section in dto.sections {
-            if aggregatedSections.count >= targetSections { break }
-            guard !section.cards.isEmpty else {
-                droppedEmptySections += 1
-                continue
-            }
-
-            let normalizedID = "\(baseID)_section_\(sectionCounter)"
-            sectionCounter += 1
-
-            let normalizedCards = section.cards.enumerated().map { index, card in
-                let cardID = "\(normalizedID)_card_\(index)"
-                return CardDTO(
-                    id: cardID,
-                    front: card.front,
-                    back: card.back,
-                    source: card.source,
-                    tags: card.tags
-                )
-            }
-
-            let normalizedSection = TopicSectionDTO(
-                id: normalizedID,
-                title: section.title,
-                cards: normalizedCards
-            )
-            aggregatedSections.append(normalizedSection)
-            addedSections += 1
-            addedCards += normalizedCards.count
-        }
-
-        return AppendResult(
-            addedSections: addedSections,
-            addedCards: addedCards,
-            droppedEmptySections: droppedEmptySections
-        )
-    }
-
-    static func validationFailureReason(for dto: TopicPackDTO) -> String {
-        var reasons: [String] = []
-        if dto.id.isEmpty { reasons.append("missing id") }
-        if dto.title.isEmpty { reasons.append("missing title") }
-        if dto.subtitle.isEmpty { reasons.append("missing subtitle") }
-        if dto.category.isEmpty { reasons.append("missing category") }
-        if dto.sections.isEmpty { reasons.append("no sections") }
-        if !dto.sections.contains(where: { !$0.cards.isEmpty }) { reasons.append("no cards in any section") }
-        return reasons.isEmpty ? "unknown validation failure" : reasons.joined(separator: ", ")
     }
 }

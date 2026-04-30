@@ -5,20 +5,23 @@ protocol AIGenerationTransport {
     func generateText(prompt: String) async throws -> String
 }
 
-/// Thin backend client for Briefly generation endpoint.
+/// Thin backend client for Briefly generation and async job endpoints.
 final class BrieflyBackendClient: AIGenerationTransport, AIGenerationJobTransport {
     private static let logger = Logger(subsystem: "dn.Briefly", category: "BrieflyBackendClient")
     private static let clientRequestIDHeader = "X-Client-Request-ID"
 
     struct Configuration {
-        let endpoint: URL
+        let generateEndpoint: URL
+        let jobsEndpoint: URL
         let timeout: TimeInterval
 
         init(
-            endpoint: URL = URL(string: "https://sxbgtlgsaf.execute-api.us-west-2.amazonaws.com/prod/generate")!,
+            generateEndpoint: URL = URL(string: "https://sxbgtlgsaf.execute-api.us-west-2.amazonaws.com/prod/generate")!,
+            jobsEndpoint: URL = URL(string: "https://sxbgtlgsaf.execute-api.us-west-2.amazonaws.com/prod/jobs")!,
             timeout: TimeInterval = 60
         ) {
-            self.endpoint = endpoint
+            self.generateEndpoint = generateEndpoint
+            self.jobsEndpoint = jobsEndpoint
             self.timeout = timeout
         }
     }
@@ -40,9 +43,13 @@ final class BrieflyBackendClient: AIGenerationTransport, AIGenerationJobTranspor
                     return "The request could not be processed. Try a clearer topic title."
                 case 401, 403:
                     return "Generation service authorization failed. Please try again shortly."
+                case 404:
+                    return "The generation job could not be found. Please try again."
+                case 409:
+                    return "The generation job is still in progress. Please wait and try again."
                 case 429:
                     return "Too many generation requests right now. Please wait a moment and try again."
-                case 500...599:
+                case 500 ... 599:
                     return "The generation service is temporarily unavailable. Please try again."
                 default:
                     return "Generation failed with status \(status). Please try again."
@@ -66,76 +73,48 @@ final class BrieflyBackendClient: AIGenerationTransport, AIGenerationJobTranspor
         }
     }
 
-    private struct RequestBody: Encodable {
+    private struct GenerateRequestBody: Encodable {
         let prompt: String
     }
 
-    private struct ResponseBody: Decodable {
+    private struct GenerateResponseBody: Decodable {
         let ok: Bool?
         let outputText: String?
     }
 
-    private actor JobStore {
-        enum State {
-            case queued
-            case running
-            case completed(result: String)
-            case failed(reason: String)
+    private struct CreateJobResponseBody: Decodable {
+        let jobId: String
+        let status: String
+        let statusUrl: String?
+        let resultUrl: String?
+    }
+
+    private struct JobStatusResponseBody: Decodable {
+        let jobId: String
+        let status: String
+        let progress: ProgressBody?
+        let error: JobErrorBody?
+        let createdAt: Int?
+        let updatedAt: Int?
+
+        struct ProgressBody: Decodable {
+            let totalChunks: Int?
+            let completedChunks: Int?
+            let failedChunks: Int?
+            let currentStage: String?
+            let assembledSections: Int?
         }
 
-        private var states: [AIGenerationJobID: State] = [:]
-
-        func create(jobID: AIGenerationJobID) {
-            states[jobID] = .queued
-        }
-
-        func markRunning(jobID: AIGenerationJobID) {
-            states[jobID] = .running
-        }
-
-        func markCompleted(jobID: AIGenerationJobID, result: String) {
-            states[jobID] = .completed(result: result)
-        }
-
-        func markFailed(jobID: AIGenerationJobID, reason: String) {
-            states[jobID] = .failed(reason: reason)
-        }
-
-        func status(for jobID: AIGenerationJobID) -> AIGenerationJobStatus? {
-            guard let state = states[jobID] else { return nil }
-
-            let mappedState: AIGenerationJobState
-            switch state {
-            case .queued:
-                mappedState = .queued
-            case .running:
-                mappedState = .running
-            case .completed:
-                mappedState = .completed
-            case .failed(let reason):
-                mappedState = .failed(reason: reason)
-            }
-
-            return AIGenerationJobStatus(id: jobID, state: mappedState)
-        }
-
-        func result(for jobID: AIGenerationJobID) -> Result<String, ClientError>? {
-            guard let state = states[jobID] else { return .failure(.jobNotFound(id: jobID.rawValue)) }
-
-            switch state {
-            case .queued, .running:
-                return .failure(.jobNotReady)
-            case .completed(let result):
-                return .success(result)
-            case .failed(let reason):
-                return .failure(.jobFailed(reason: reason))
-            }
+        struct JobErrorBody: Decodable {
+            let code: String?
+            let message: String?
+            let retryable: Bool?
+            let stage: String?
         }
     }
 
     private let config: Configuration
     private let urlSession: URLSession
-    private let jobStore = JobStore()
 
     init(configuration: Configuration = .init(), urlSession: URLSession? = nil) {
         self.config = configuration
@@ -155,82 +134,185 @@ final class BrieflyBackendClient: AIGenerationTransport, AIGenerationJobTranspor
         return try await sendGenerateRequest(prompt: prompt, requestID: requestID)
     }
 
-    func startGenerationJob(prompt: String) async throws -> AIGenerationJobID {
-        let jobID = AIGenerationJobID()
-        await jobStore.create(jobID: jobID)
-        Self.logger.debug("Backend job start: jobID=\(jobID.rawValue, privacy: .public) promptLength=\(prompt.count, privacy: .public)")
+    func startGenerationJob(request: AIGenerationJobRequestPayload) async throws -> AIGenerationJobID {
+        let requestID = UUID().uuidString
+        Self.logger.debug(
+            "Backend job create start: requestID=\(requestID, privacy: .public) jobsEndpoint=\(self.config.jobsEndpoint.absoluteString, privacy: .public) titleLength=\(request.title.count, privacy: .public)"
+        )
 
-        Task {
-            await self.jobStore.markRunning(jobID: jobID)
-            do {
-                let output = try await self.generateText(prompt: prompt)
-                await self.jobStore.markCompleted(jobID: jobID, result: output)
-                Self.logger.debug("Backend job completed: jobID=\(jobID.rawValue, privacy: .public) outputLength=\(output.count, privacy: .public)")
-            } catch {
-                await self.jobStore.markFailed(jobID: jobID, reason: error.localizedDescription)
-                Self.logger.error("Backend job failed: jobID=\(jobID.rawValue, privacy: .public) reason=\(error.localizedDescription, privacy: .public)")
-            }
-        }
+        var urlRequest = URLRequest(url: config.jobsEndpoint)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(requestID, forHTTPHeaderField: Self.clientRequestIDHeader)
+        urlRequest.httpBody = try JSONEncoder().encode(request)
 
+        let data = try await sendRequest(urlRequest, requestID: requestID)
+        let decoded = try decode(CreateJobResponseBody.self, from: data, requestID: requestID)
+
+        let jobID = AIGenerationJobID(rawValue: decoded.jobId)
+        Self.logger.debug(
+            "Backend job create success: requestID=\(requestID, privacy: .public) jobID=\(jobID.rawValue, privacy: .public) status=\(decoded.status, privacy: .public)"
+        )
         return jobID
     }
 
     func fetchGenerationJobStatus(id: AIGenerationJobID) async throws -> AIGenerationJobStatus {
-        if let status = await jobStore.status(for: id) {
-            return status
+        let requestID = UUID().uuidString
+        let endpoint = config.jobsEndpoint.appendingPathComponent(id.rawValue)
+
+        Self.logger.debug(
+            "Backend job status start: requestID=\(requestID, privacy: .public) jobID=\(id.rawValue, privacy: .public) endpoint=\(endpoint.absoluteString, privacy: .public)"
+        )
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "GET"
+        request.setValue(requestID, forHTTPHeaderField: Self.clientRequestIDHeader)
+
+        let data = try await sendRequest(request, requestID: requestID)
+        let decoded = try decode(JobStatusResponseBody.self, from: data, requestID: requestID)
+
+        let state: AIGenerationJobState
+        switch decoded.status.uppercased() {
+        case "QUEUED":
+            state = .queued
+        case "RUNNING", "ASSEMBLING":
+            state = .running
+        case "SUCCEEDED":
+            state = .completed
+        case "FAILED", "EXPIRED":
+            let reason = decoded.error?.message ?? decoded.error?.code ?? "Unknown failure"
+            state = .failed(reason: reason)
+        default:
+            throw ClientError.invalidResponse
         }
-        throw ClientError.jobNotFound(id: id.rawValue)
+
+        return AIGenerationJobStatus(id: AIGenerationJobID(rawValue: decoded.jobId), state: state)
     }
 
     func fetchGenerationJobResult(id: AIGenerationJobID) async throws -> String {
-        guard let result = await jobStore.result(for: id) else {
-            throw ClientError.jobNotFound(id: id.rawValue)
+        let maxAttempts = 6
+
+        for attempt in 1...maxAttempts {
+            let requestID = UUID().uuidString
+            let endpoint = config.jobsEndpoint
+                .appendingPathComponent(id.rawValue)
+                .appendingPathComponent("result")
+
+            Self.logger.debug(
+                "Backend job result start: requestID=\(requestID, privacy: .public) jobID=\(id.rawValue, privacy: .public) attempt=\(attempt, privacy: .public) endpoint=\(endpoint.absoluteString, privacy: .public)"
+            )
+
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "GET"
+            request.setValue(requestID, forHTTPHeaderField: Self.clientRequestIDHeader)
+
+            do {
+                let data = try await sendRequest(request, requestID: requestID)
+
+                guard let jsonObject = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw ClientError.invalidResponse
+                }
+
+                if let status = jsonObject["status"] as? String,
+                   status.uppercased() != "SUCCEEDED" {
+                    if let message = jsonObject["message"] as? String {
+                        throw ClientError.jobFailed(reason: message)
+                    }
+                    throw ClientError.jobNotReady
+                }
+
+                guard let resultObject = jsonObject["result"] else {
+                    throw ClientError.invalidResponse
+                }
+
+                let resultData = try JSONSerialization.data(withJSONObject: resultObject, options: [.sortedKeys])
+
+                guard let resultString = String(data: resultData, encoding: .utf8) else {
+                    throw ClientError.invalidResponse
+                }
+
+                Self.logger.debug(
+                    "Backend job result success: requestID=\(requestID, privacy: .public) jobID=\(id.rawValue, privacy: .public) attempt=\(attempt, privacy: .public) resultLength=\(resultString.count, privacy: .public)"
+                )
+                return resultString
+            } catch let error as ClientError {
+                let shouldRetry: Bool
+
+                switch error {
+                case .jobNotFound, .jobNotReady:
+                    shouldRetry = attempt < maxAttempts
+                default:
+                    shouldRetry = false
+                }
+
+                if shouldRetry {
+                    Self.logger.debug(
+                        "Backend job result retry: jobID=\(id.rawValue, privacy: .public) attempt=\(attempt, privacy: .public)"
+                    )
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    continue
+                }
+
+                throw error
+            }
         }
 
-        switch result {
-        case .success(let output):
-            return output
-        case .failure(let error):
-            throw error
-        }
+        throw ClientError.jobNotReady
     }
 
     private func sendGenerateRequest(prompt: String, requestID: String) async throws -> String {
         Self.logger.debug(
-            "Backend request start: requestID=\(requestID, privacy: .public) endpoint=\(self.config.endpoint.absoluteString, privacy: .public) promptLength=\(prompt.count, privacy: .public)"
+            "Backend request start: requestID=\(requestID, privacy: .public) endpoint=\(self.config.generateEndpoint.absoluteString, privacy: .public) promptLength=\(prompt.count, privacy: .public)"
         )
 
-        var request = URLRequest(url: config.endpoint)
+        var request = URLRequest(url: config.generateEndpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(requestID, forHTTPHeaderField: Self.clientRequestIDHeader)
-        request.httpBody = try JSONEncoder().encode(RequestBody(prompt: prompt))
+        request.httpBody = try JSONEncoder().encode(GenerateRequestBody(prompt: prompt))
 
+        let data = try await sendRequest(request, requestID: requestID)
+        let decoded = try decode(GenerateResponseBody.self, from: data, requestID: requestID)
+
+        guard decoded.ok == true,
+              let outputText = decoded.outputText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !outputText.isEmpty else {
+            Self.logger.error("Backend request failed: requestID=\(requestID, privacy: .public) reason=invalid_response_envelope")
+            throw ClientError.invalidResponse
+        }
+
+        Self.logger.debug(
+            "Backend request success: requestID=\(requestID, privacy: .public) outputLength=\(outputText.count, privacy: .public)"
+        )
+        return outputText
+    }
+
+    private func sendRequest(_ request: URLRequest, requestID: String) async throws -> Data {
         do {
             let (data, response) = try await urlSession.data(for: request)
+
             guard let http = response as? HTTPURLResponse else {
                 Self.logger.error("Backend request failed: requestID=\(requestID, privacy: .public) reason=invalid_http_response")
                 throw ClientError.invalidResponse
             }
-            guard (200..<300).contains(http.statusCode) else {
+
+            guard (200 ..< 300).contains(http.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? ""
                 Self.logger.error(
                     "Backend non-success response: requestID=\(requestID, privacy: .public) status=\(http.statusCode, privacy: .public) body=\(body, privacy: .public)"
                 )
-                throw ClientError.badResponse(status: http.statusCode, body: body)
+
+                switch http.statusCode {
+                case 404:
+                    throw ClientError.jobNotFound(id: "unknown")
+                case 409:
+                    throw ClientError.jobNotReady
+                default:
+                    throw ClientError.badResponse(status: http.statusCode, body: body)
+                }
             }
 
-            let decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
-            guard decoded.ok == true, let outputText = decoded.outputText?.trimmingCharacters(in: .whitespacesAndNewlines), !outputText.isEmpty else {
-                Self.logger.error("Backend request failed: requestID=\(requestID, privacy: .public) reason=invalid_response_envelope")
-                throw ClientError.invalidResponse
-            }
-            let lambdaRequestID = (http.value(forHTTPHeaderField: "X-Lambda-Request-ID") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let echoedClientID = (http.value(forHTTPHeaderField: Self.clientRequestIDHeader) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            Self.logger.debug(
-                "Backend request success: requestID=\(requestID, privacy: .public) echoedClientRequestID=\(echoedClientID, privacy: .public) lambdaRequestID=\(lambdaRequestID, privacy: .public) outputLength=\(outputText.count, privacy: .public)"
-            )
-            return outputText
+            return data
         } catch let clientError as ClientError {
             throw clientError
         } catch is DecodingError {
@@ -244,6 +326,18 @@ final class BrieflyBackendClient: AIGenerationTransport, AIGenerationJobTranspor
                 "Backend request failed: requestID=\(requestID, privacy: .public) reason=transport_error details=\(error.localizedDescription, privacy: .public)"
             )
             throw ClientError.transport(error)
+        }
+    }
+
+    private func decode<T: Decodable>(_ type: T.Type, from data: Data, requestID: String) throws -> T {
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            Self.logger.error(
+                "Backend decode failed: requestID=\(requestID, privacy: .public) body=\(body, privacy: .public)"
+            )
+            throw ClientError.invalidResponse
         }
     }
 }
