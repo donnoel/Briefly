@@ -82,57 +82,60 @@ struct LibraryView: View {
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toolbarBackground(libraryCompactHeaderVisible ? .visible : .hidden, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    showingSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("Settings")
-            }
             ToolbarItem(placement: .principal) {
                 compactLibraryHeader
             }
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button {
-                        Task { await generateRandomTopic() }
+                        showingSettings = true
                     } label: {
-                        Label("Surprise me", systemImage: "sparkles.tv")
+                        Label("Settings", systemImage: "gearshape")
                     }
-                    .disabled(isGeneratingRandom)
 
-                    if !viewModel.availableCategories.isEmpty {
-                        Picker("Category", selection: $viewModel.selectedCategory) {
-                            Text("All categories").tag(String?.none)
-                            ForEach(viewModel.availableCategories, id: \.self) { category in
-                                Text(category).tag(String?.some(category))
+                    Button {
+                        showingAIGenerator = true
+                    } label: {
+                        Label("Generate", systemImage: "sparkles")
+                    }
+
+                    Section("Filters") {
+                        Button {
+                            Task { await generateRandomTopic() }
+                        } label: {
+                            Label("Surprise me", systemImage: "sparkles.tv")
+                        }
+                        .disabled(isGeneratingRandom)
+
+                        if !viewModel.availableCategories.isEmpty {
+                            Picker("Category", selection: $viewModel.selectedCategory) {
+                                Text("All categories").tag(String?.none)
+                                ForEach(viewModel.availableCategories, id: \.self) { category in
+                                    Text(category).tag(String?.some(category))
+                                }
                             }
                         }
-                    }
 
-                    Picker("Difficulty", selection: $viewModel.selectedDifficulty) {
-                        Text("All difficulties").tag(Difficulty?.none)
-                        ForEach(Difficulty.allCases, id: \.self) { level in
-                            Text(level.rawValue).tag(Difficulty?.some(level))
+                        Picker("Difficulty", selection: $viewModel.selectedDifficulty) {
+                            Text("All difficulties").tag(Difficulty?.none)
+                            ForEach(Difficulty.allCases, id: \.self) { level in
+                                Text(level.rawValue).tag(Difficulty?.some(level))
+                            }
                         }
-                    }
 
-                    Button("Clear filters") {
-                        clearFilters()
+                        Button("Clear filters") {
+                            clearFilters()
+                        }
+                        .disabled(!hasActiveFilters)
                     }
-                    .disabled(!hasActiveFilters)
                 } label: {
-                    Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    HStack(spacing: 8) {
+                        Image(systemName: "gearshape")
+                        Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        Image(systemName: "sparkles")
+                    }
                 }
-                .accessibilityLabel("Filters")
-
-                Button {
-                    showingAIGenerator = true
-                } label: {
-                    Label("Generate", systemImage: "sparkles")
-                }
-                .accessibilityLabel("Generate with AI")
+                .accessibilityLabel("Settings, filters, and generate")
             }
         }
         .searchable(
