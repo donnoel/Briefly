@@ -50,7 +50,9 @@ final class ContentRepository: ObservableObject {
         self.statusStore = statusStore ?? .shared
         self.orderStore = orderStore ?? .shared
         self.progressStore = progressStore ?? .shared
-        self.cloudSyncService = cloudSyncService ?? CloudTopicSyncService.shared
+        self.cloudSyncService = ProcessInfo.processInfo.arguments.contains("-uiTestDisableCloudSync")
+            ? nil
+            : (cloudSyncService ?? CloudTopicSyncService.shared)
         observeStoreChangesForCloudSync()
         initialLoadTask = Task { @MainActor in
             await performInitialLoad()

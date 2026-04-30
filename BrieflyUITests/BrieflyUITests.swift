@@ -80,6 +80,39 @@ final class BrieflyUITests: XCTestCase {
     }
 
     @MainActor
+    func testCompletingSeededSectionPersistsAfterRelaunch() throws {
+        var app = makeSeededApp(resetState: true)
+        app.launch()
+
+        openFirstTopic(in: app)
+        openFirstSectionInTopic(in: app)
+        finishCurrentSection(in: app)
+
+        XCTAssertTrue(
+            app.staticTexts["Section complete"].waitForExistence(timeout: 5),
+            "Expected the deck to show section completion after finishing the seeded card."
+        )
+
+        app.terminate()
+
+        app = makeSeededApp()
+        app.launch()
+
+        openFirstTopic(in: app)
+
+        XCTAssertTrue(
+            app.staticTexts["Completed"].waitForExistence(timeout: 10),
+            "Expected section completion to persist after relaunch."
+        )
+        XCTAssertTrue(
+            app.staticTexts["Review again"].waitForExistence(timeout: 5),
+            "Expected the completed section to remain available for review after relaunch."
+        )
+
+        app.terminate()
+    }
+
+    @MainActor
     private func runStudyFlow(in app: XCUIApplication) {
         app.swipeUp()
         app.swipeDown()
@@ -107,6 +140,17 @@ final class BrieflyUITests: XCTestCase {
     }
 
     @MainActor
+    private func finishCurrentSection(in app: XCUIApplication) {
+        let seeAnswerButton = app.buttons["See answer"].firstMatch
+        XCTAssertTrue(seeAnswerButton.waitForExistence(timeout: 5), "Expected deck screen to show the answer reveal action.")
+        seeAnswerButton.tap()
+
+        let finishButton = app.buttons["Finish section"].firstMatch
+        XCTAssertTrue(finishButton.waitForExistence(timeout: 5), "Expected final card to expose the finish action.")
+        finishButton.tap()
+    }
+
+    @MainActor
     private func assertSeededTopicExists(in app: XCUIApplication) {
         app.launch()
         let topicCard = app.descendants(matching: .any)["library.topic.card"].firstMatch
@@ -115,8 +159,15 @@ final class BrieflyUITests: XCTestCase {
     }
 
     private func makePerfApp() -> XCUIApplication {
+        makeSeededApp()
+    }
+
+    private func makeSeededApp(resetState: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-uiTestSeedTopic"]
+        app.launchArguments += ["-uiTestSeedTopic", "-uiTestDisableCloudSync"]
+        if resetState {
+            app.launchArguments += ["-uiTestResetState"]
+        }
         return app
     }
 

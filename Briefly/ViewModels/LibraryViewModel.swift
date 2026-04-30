@@ -641,3 +641,59 @@ enum SurpriseMeAssembly {
         return reasons.isEmpty ? "unknown validation failure" : reasons.joined(separator: ", ")
     }
 }
+
+enum FreshTopicsAssembly {
+    struct AppendSectionsResult {
+        let addedSections: Int
+        let addedCards: Int
+        let droppedEmptySections: Int
+    }
+
+    static func appendSections(
+        from dto: TopicPackDTO,
+        baseID: String,
+        into aggregated: inout [TopicSectionDTO],
+        targetSections: Int,
+        sectionCounter: inout Int
+    ) -> AppendSectionsResult {
+        var addedSections = 0
+        var addedCards = 0
+        var droppedEmptySections = 0
+
+        for section in dto.sections {
+            guard aggregated.count < targetSections else { break }
+            guard !section.cards.isEmpty else {
+                droppedEmptySections += 1
+                continue
+            }
+
+            let sectionID = "\(baseID)_section_\(sectionCounter)"
+            sectionCounter += 1
+            var cardCounter = 0
+            let cards = section.cards.map { card in
+                let cardID = "\(sectionID)_card_\(cardCounter)"
+                cardCounter += 1
+                return CardDTO(
+                    id: cardID,
+                    front: card.front,
+                    back: card.back,
+                    source: card.source,
+                    tags: card.tags
+                )
+            }
+            aggregated.append(TopicSectionDTO(id: sectionID, title: section.title, cards: cards))
+            addedSections += 1
+            addedCards += cards.count
+        }
+
+        return AppendSectionsResult(
+            addedSections: addedSections,
+            addedCards: addedCards,
+            droppedEmptySections: droppedEmptySections
+        )
+    }
+
+    static func validationFailureReason(for dto: TopicPackDTO) -> String {
+        SurpriseMeAssembly.validationFailureReason(for: dto)
+    }
+}

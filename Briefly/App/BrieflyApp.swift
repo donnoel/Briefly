@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct BrieflyApp: App {
     init() {
+        Self.resetStateForUITestsIfNeeded()
         Self.persistSettingsVersionDisplay()
     }
 
@@ -40,5 +41,26 @@ struct BrieflyApp: App {
         }
 
         UserDefaults.standard.set(displayValue, forKey: "app_version_display")
+    }
+
+    private static func resetStateForUITestsIfNeeded() {
+        guard ProcessInfo.processInfo.arguments.contains("-uiTestResetState") else { return }
+
+        let defaults = UserDefaults.standard
+        [
+            "Briefly.completedTopicIDs",
+            "Briefly.deletedTopicIDs",
+            "Briefly.learnedCardIDs",
+            "Briefly.completedSectionIDs",
+            "Briefly.topicOrder",
+            "Briefly.recentTopicIDs"
+        ].forEach(defaults.removeObject(forKey:))
+
+        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+
+        let userContentURL = documents.appendingPathComponent("user_content.json")
+        try? FileManager.default.removeItem(at: userContentURL)
     }
 }

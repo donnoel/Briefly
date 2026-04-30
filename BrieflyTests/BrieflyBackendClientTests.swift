@@ -9,7 +9,7 @@ struct BrieflyBackendClientTests {
         let transport = makeTransport(responses: [
             .http(status: 200, body: #"{"ok":true,"outputText":"{\"id\":\"sample\"}"}"#)
         ])
-        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+        let client = makeClient(session: transport.session, transport: transport)
 
         let result = try await client.generateText(prompt: "Generate sample")
 
@@ -31,7 +31,7 @@ struct BrieflyBackendClientTests {
         let transport = makeTransport(responses: [
             .http(status: 503, body: #"{"message":"unavailable"}"#)
         ])
-        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+        let client = makeClient(session: transport.session, transport: transport)
 
         do {
             _ = try await client.generateText(prompt: "test")
@@ -53,7 +53,7 @@ struct BrieflyBackendClientTests {
         let transport = makeTransport(responses: [
             .http(status: 200, body: #"{"ok":true,"outputText":""}"#)
         ])
-        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+        let client = makeClient(session: transport.session, transport: transport)
 
         do {
             _ = try await client.generateText(prompt: "test")
@@ -72,7 +72,7 @@ struct BrieflyBackendClientTests {
         let transport = makeTransport(responses: [
             .error(URLError(.timedOut))
         ])
-        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+        let client = makeClient(session: transport.session, transport: transport)
 
         do {
             _ = try await client.generateText(prompt: "test")
@@ -89,11 +89,13 @@ struct BrieflyBackendClientTests {
     @Test
     func jobLifecycleCompletesAndReturnsResult() async throws {
         let transport = makeTransport(responses: [
-            .http(status: 200, body: #"{"ok":true,"outputText":"{\"id\":\"from_job\"}"}"#)
+            .http(status: 200, body: #"{"jobId":"job-success","status":"QUEUED"}"#),
+            .http(status: 200, body: #"{"jobId":"job-success","status":"SUCCEEDED"}"#),
+            .http(status: 200, body: #"{"status":"SUCCEEDED","result":{"id":"from_job"}}"#)
         ])
-        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+        let client = makeClient(session: transport.session, transport: transport)
 
-        let jobID = try await client.startGenerationJob(prompt: "Generate job payload")
+        let jobID = try await client.startGenerationJob(request: makeJobRequest())
 
         var status = try await client.fetchGenerationJobStatus(id: jobID)
         var attempts = 0
@@ -111,11 +113,13 @@ struct BrieflyBackendClientTests {
     @Test
     func jobLifecyclePropagatesBackendFailure() async throws {
         let transport = makeTransport(responses: [
-            .http(status: 503, body: #"{"message":"unavailable"}"#)
+            .http(status: 200, body: #"{"jobId":"job-fail","status":"QUEUED"}"#),
+            .http(status: 200, body: #"{"jobId":"job-fail","status":"FAILED","error":{"message":"unavailable"}}"#),
+            .http(status: 200, body: #"{"status":"FAILED","message":"unavailable"}"#)
         ])
-        let client = makeClient(session: transport.session, endpoint: transport.endpoint)
+        let client = makeClient(session: transport.session, transport: transport)
 
-        let jobID = try await client.startGenerationJob(prompt: "Generate job payload")
+        let jobID = try await client.startGenerationJob(request: makeJobRequest())
 
         var status = try await client.fetchGenerationJobStatus(id: jobID)
         var attempts = 0
@@ -146,8 +150,11 @@ struct BrieflyBackendClientTests {
         }
     }
 
-    private func makeClient(session: URLSession, endpoint: URL) -> BrieflyBackendClient {
-        let config = BrieflyBackendClient.Configuration(endpoint: endpoint)
+    private func makeClient(session: URLSession, transport: MockTransport) -> BrieflyBackendClient {
+        let config = BrieflyBackendClient.Configuration(
+            generateEndpoint: transport.generateEndpoint,
+            jobsEndpoint: transport.jobsEndpoint
+        )
         return BrieflyBackendClient(configuration: config, urlSession: session)
     }
 
@@ -156,8 +163,25 @@ struct BrieflyBackendClientTests {
         MockBackendURLProtocol.configure(responses, for: host)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockBackendURLProtocol.self]
-        let endpoint = URL(string: "https://\(host)/prod/generate")!
-        return MockTransport(session: URLSession(configuration: configuration), host: host, endpoint: endpoint)
+        let generateEndpoint = URL(string: "https://\(host)/prod/generate")!
+        let jobsEndpoint = URL(string: "https://\(host)/prod/jobs")!
+        return MockTransport(
+            session: URLSession(configuration: configuration),
+            host: host,
+            generateEndpoint: generateEndpoint,
+            jobsEndpoint: jobsEndpoint
+        )
+    }
+
+    private func makeJobRequest() -> AIGenerationJobRequestPayload {
+        AIGenerationJobRequestPayload(
+            title: "Generate job payload",
+            difficulty: "Beginner",
+            language: "en",
+            targetSections: 1,
+            targetCardsPerSection: 1,
+            model: nil
+        )
     }
 
     private func requestBodyData(from request: URLRequest) -> Data? {
@@ -199,7 +223,8 @@ private struct RequestPayload: Decodable {
 private struct MockTransport {
     let session: URLSession
     let host: String
-    let endpoint: URL
+    let generateEndpoint: URL
+    let jobsEndpoint: URL
 }
 
 private final class MockBackendURLProtocol: URLProtocol {

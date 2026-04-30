@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Briefly
 
+@MainActor
 struct AIContentServiceTests {
 
     @Test
@@ -152,7 +153,7 @@ private struct MockJobTransport: AIGenerationTransport, AIGenerationJobTransport
         output
     }
 
-    func startGenerationJob(prompt: String) async throws -> AIGenerationJobID {
+    func startGenerationJob(request: AIGenerationJobRequestPayload) async throws -> AIGenerationJobID {
         fixedJobID
     }
 
