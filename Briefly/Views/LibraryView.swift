@@ -455,10 +455,40 @@ struct LibraryView: View {
 
     private var continueLearningSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeader(
-                title: "Continue",
-                subtitle: "Recent and in-progress topics stay front and center."
-            )
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: "bolt.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrieflyTheme.Colors.accent)
+                    .padding(6)
+                    .background(
+                        Circle()
+                            .fill(BrieflyTheme.Colors.accentSoft(colorScheme))
+                    )
+
+                Text("Continue")
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .foregroundColor(BrieflyTheme.Colors.textPrimary)
+
+                Spacer()
+
+                Text("Resume queue • \(viewModel.continueLearningTopics.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(BrieflyTheme.Colors.elevatedBackground(colorScheme))
+                            .overlay(
+                                Capsule()
+                                    .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
+                            )
+                    )
+            }
+
+            Text("Recent and in-progress topics stay front and center.")
+                .font(.subheadline)
+                .foregroundColor(BrieflyTheme.Colors.textSecondary)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 18) {
@@ -469,9 +499,21 @@ struct LibraryView: View {
                 }
                 .padding(.vertical, 2)
             }
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.04),
+                        .init(color: .black, location: 0.96),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
         }
         .padding(18)
-        .background(sectionShell(accent: BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme)))
+        .background(continueSectionShell)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 8, leading: sectionHorizontalInset, bottom: 6, trailing: sectionHorizontalInset))
         .listRowBackground(Color.clear)
@@ -761,6 +803,47 @@ struct LibraryView: View {
                     .frame(width: 120, height: 120)
                     .blur(radius: 22)
                     .offset(x: 20, y: -20)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
+            )
+    }
+
+    private var continueSectionShell: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        BrieflyTheme.Colors.cardBackground(colorScheme).opacity(colorScheme == .dark ? 0.96 : 0.98),
+                        BrieflyTheme.Colors.libraryAmbientTertiary(colorScheme).opacity(colorScheme == .dark ? 0.12 : 0.08)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                BrieflyTheme.Colors.accent.opacity(0.9),
+                                BrieflyTheme.Colors.accentSecondary.opacity(0.8)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 4)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+            }
+            .overlay(alignment: .topTrailing) {
+                Circle()
+                    .fill(BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme).opacity(colorScheme == .dark ? 0.16 : 0.10))
+                    .frame(width: 150, height: 150)
+                    .blur(radius: 22)
+                    .offset(x: 24, y: -24)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
