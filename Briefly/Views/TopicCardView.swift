@@ -14,7 +14,10 @@ struct TopicCardView: View {
     var variant: Variant = .standard
 
     private var style: BrieflyTheme.TopicVisualStyle {
-        BrieflyTheme.Colors.topicStyle(for: topic.category)
+        BrieflyTheme.Colors.topicStyle(
+            for: topic.category,
+            context: "\(topic.title) \(topic.subtitle)"
+        )
     }
 
     private var progressPercent: Int {

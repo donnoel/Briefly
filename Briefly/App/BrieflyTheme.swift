@@ -279,8 +279,17 @@ enum BrieflyTheme {
             }
         }
 
-        static func topicStyle(for category: String) -> TopicVisualStyle {
-            let normalized = category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        static func topicStyle(for category: String, context: String? = nil) -> TopicVisualStyle {
+            let normalizedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let normalizedContext = context?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+            let isGenericCategory = normalizedCategory.isEmpty
+                || normalizedCategory == "general"
+                || normalizedCategory == "topics"
+                || normalizedCategory == "misc"
+                || normalizedCategory == "other"
+            let normalized = isGenericCategory
+                ? normalizedContext
+                : "\(normalizedCategory) \(normalizedContext)"
 
             if normalized.contains("biology") || normalized.contains("nature") || normalized.contains("health") || normalized.contains("animal") || normalized.contains("garden") {
                 return TopicVisualStyle(
