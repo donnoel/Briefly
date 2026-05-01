@@ -9,7 +9,10 @@ struct TopicDetailView: View {
     @State private var compactHeaderVisible = false
 
     private var style: BrieflyTheme.TopicVisualStyle {
-        BrieflyTheme.Colors.topicStyle(for: viewModel.topic.category)
+        BrieflyTheme.Colors.topicStyle(
+            for: viewModel.topic.category,
+            context: "\(viewModel.topic.title) \(viewModel.topic.subtitle)"
+        )
     }
 
     private var totalCardCount: Int {

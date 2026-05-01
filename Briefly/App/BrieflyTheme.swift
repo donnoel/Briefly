@@ -47,7 +47,6 @@ enum BrieflyTheme {
 
         // MARK: - Backgrounds
 
-        /// App background – adapts to light/dark.
         static func background(_ scheme: ColorScheme) -> Color {
             switch scheme {
             case .dark:
@@ -57,7 +56,6 @@ enum BrieflyTheme {
             }
         }
 
-        /// Elevated surfaces like cards – adapts to light/dark.
         static func cardBackground(_ scheme: ColorScheme) -> Color {
             switch scheme {
             case .dark:
@@ -67,7 +65,6 @@ enum BrieflyTheme {
             }
         }
 
-        /// Very soft stroke / border for subtle separation.
         static func cardStroke(_ scheme: ColorScheme) -> Color {
             switch scheme {
             case .dark:
@@ -79,14 +76,12 @@ enum BrieflyTheme {
 
         // MARK: - Accents
 
-        /// Primary accent for buttons, chips, and key highlights.
         static let accent = Color(
-            red: 0.32,
-            green: 0.42,
-            blue: 0.96
+            red: 0.98,
+            green: 0.44,
+            blue: 0.26
         )
 
-        /// Soft accent background for pills and tags.
         static func accentSoft(_ scheme: ColorScheme) -> Color {
             switch scheme {
             case .dark:
@@ -96,14 +91,12 @@ enum BrieflyTheme {
             }
         }
 
-        /// Secondary accent (used sparingly for gradients, etc.).
         static let accentSecondary = Color(
-            red: 0.55,
-            green: 0.40,
-            blue: 0.95
+            red: 0.10,
+            green: 0.74,
+            blue: 0.66
         )
 
-        /// Shadow for floating cards.
         static func shadowSoft(_ scheme: ColorScheme) -> Color {
             switch scheme {
             case .dark:
@@ -264,7 +257,7 @@ enum BrieflyTheme {
             case .dark:
                 return accentSecondary.opacity(0.18)
             default:
-                return Color(red: 0.40, green: 0.54, blue: 1.0).opacity(0.12)
+                return Color(red: 0.16, green: 0.72, blue: 0.86).opacity(0.13)
             }
         }
 
@@ -273,7 +266,7 @@ enum BrieflyTheme {
             case .dark:
                 return Color(red: 0.08, green: 0.65, blue: 0.60).opacity(0.12)
             default:
-                return Color(red: 0.16, green: 0.80, blue: 0.74).opacity(0.10)
+                return Color(red: 0.99, green: 0.72, blue: 0.30).opacity(0.11)
             }
         }
 
@@ -282,141 +275,172 @@ enum BrieflyTheme {
             case .dark:
                 return Color(red: 0.95, green: 0.53, blue: 0.28).opacity(0.08)
             default:
-                return Color(red: 0.95, green: 0.55, blue: 0.28).opacity(0.08)
+                return Color(red: 0.98, green: 0.40, blue: 0.50).opacity(0.09)
             }
         }
 
-        static func topicStyle(for category: String) -> TopicVisualStyle {
-            let normalized = category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        static func topicStyle(for category: String, context: String? = nil) -> TopicVisualStyle {
+            let normalizedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let normalizedContext = context?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+            let isGenericCategory = normalizedCategory.isEmpty
+                || normalizedCategory == "general"
+                || normalizedCategory == "topics"
+                || normalizedCategory == "misc"
+                || normalizedCategory == "other"
+            let normalized = isGenericCategory
+                ? normalizedContext
+                : "\(normalizedCategory) \(normalizedContext)"
 
-            if normalized.contains("biology") || normalized.contains("nature") || normalized.contains("health") {
+            if normalized.contains("biology") || normalized.contains("nature") || normalized.contains("health") || normalized.contains("animal") || normalized.contains("garden") {
                 return TopicVisualStyle(
                     symbolName: "leaf.fill",
                     lightGradient: [
-                        Color(red: 0.03, green: 0.45, blue: 0.49),
-                        Color(red: 0.05, green: 0.60, blue: 0.63),
-                        Color(red: 0.22, green: 0.90, blue: 0.78)
+                        Color(red: 0.05, green: 0.42, blue: 0.38),
+                        Color(red: 0.07, green: 0.56, blue: 0.47),
+                        Color(red: 0.34, green: 0.83, blue: 0.62)
                     ],
                     darkGradient: [
-                        Color(red: 0.03, green: 0.20, blue: 0.22),
-                        Color(red: 0.04, green: 0.28, blue: 0.29),
-                        Color(red: 0.08, green: 0.44, blue: 0.39)
+                        Color(red: 0.03, green: 0.18, blue: 0.16),
+                        Color(red: 0.05, green: 0.25, blue: 0.22),
+                        Color(red: 0.10, green: 0.39, blue: 0.31)
                     ],
-                    lightTint: Color(red: 0.70, green: 1.00, blue: 0.90),
-                    darkTint: Color(red: 0.56, green: 0.96, blue: 0.84),
-                    lightHighlight: Color(red: 0.86, green: 1.00, blue: 0.95),
-                    darkHighlight: Color(red: 0.46, green: 0.93, blue: 0.80),
-                    lightAmbient: Color(red: 0.17, green: 0.83, blue: 0.73),
-                    darkAmbient: Color(red: 0.09, green: 0.52, blue: 0.47)
+                    lightTint: Color(red: 0.84, green: 0.98, blue: 0.91),
+                    darkTint: Color(red: 0.60, green: 0.93, blue: 0.77),
+                    lightHighlight: Color(red: 0.90, green: 1.00, blue: 0.95),
+                    darkHighlight: Color(red: 0.50, green: 0.90, blue: 0.72),
+                    lightAmbient: Color(red: 0.18, green: 0.72, blue: 0.54),
+                    darkAmbient: Color(red: 0.08, green: 0.44, blue: 0.33)
                 )
             }
 
-            if normalized.contains("engineer") || normalized.contains("technology") || normalized.contains("math") {
+            if normalized.contains("engineer") || normalized.contains("technology") || normalized.contains("math") || normalized.contains("artificial intelligence") || normalized.contains("program") || normalized.contains("coding") {
                 return TopicVisualStyle(
                     symbolName: "gearshape.2.fill",
                     lightGradient: [
-                        Color(red: 0.08, green: 0.24, blue: 0.62),
-                        Color(red: 0.11, green: 0.36, blue: 0.80),
-                        Color(red: 0.36, green: 0.74, blue: 0.98)
+                        Color(red: 0.04, green: 0.22, blue: 0.66),
+                        Color(red: 0.08, green: 0.44, blue: 0.88),
+                        Color(red: 0.19, green: 0.69, blue: 0.98)
                     ],
                     darkGradient: [
-                        Color(red: 0.04, green: 0.11, blue: 0.30),
-                        Color(red: 0.05, green: 0.16, blue: 0.39),
-                        Color(red: 0.10, green: 0.30, blue: 0.63)
+                        Color(red: 0.03, green: 0.10, blue: 0.30),
+                        Color(red: 0.05, green: 0.18, blue: 0.42),
+                        Color(red: 0.08, green: 0.31, blue: 0.62)
                     ],
-                    lightTint: Color(red: 0.82, green: 0.92, blue: 1.00),
-                    darkTint: Color(red: 0.72, green: 0.87, blue: 1.00),
-                    lightHighlight: Color(red: 0.88, green: 0.95, blue: 1.00),
-                    darkHighlight: Color(red: 0.57, green: 0.78, blue: 1.00),
-                    lightAmbient: Color(red: 0.20, green: 0.55, blue: 0.98),
-                    darkAmbient: Color(red: 0.10, green: 0.31, blue: 0.68)
+                    lightTint: Color(red: 0.85, green: 0.92, blue: 1.00),
+                    darkTint: Color(red: 0.70, green: 0.84, blue: 1.00),
+                    lightHighlight: Color(red: 0.90, green: 0.95, blue: 1.00),
+                    darkHighlight: Color(red: 0.54, green: 0.76, blue: 1.00),
+                    lightAmbient: Color(red: 0.14, green: 0.49, blue: 0.92),
+                    darkAmbient: Color(red: 0.08, green: 0.28, blue: 0.62)
                 )
             }
 
-            if normalized.contains("economic") || normalized.contains("finance") || normalized.contains("business") {
+            if normalized.contains("economic") || normalized.contains("finance") || normalized.contains("business") || normalized.contains("entrepreneur") {
                 return TopicVisualStyle(
                     symbolName: "chart.line.uptrend.xyaxis",
                     lightGradient: [
-                        Color(red: 0.78, green: 0.26, blue: 0.19),
-                        Color(red: 0.92, green: 0.42, blue: 0.22),
-                        Color(red: 0.99, green: 0.73, blue: 0.30)
+                        Color(red: 0.74, green: 0.30, blue: 0.16),
+                        Color(red: 0.88, green: 0.46, blue: 0.20),
+                        Color(red: 0.96, green: 0.71, blue: 0.29)
                     ],
                     darkGradient: [
-                        Color(red: 0.33, green: 0.10, blue: 0.06),
-                        Color(red: 0.42, green: 0.15, blue: 0.05),
-                        Color(red: 0.57, green: 0.29, blue: 0.09)
+                        Color(red: 0.30, green: 0.12, blue: 0.06),
+                        Color(red: 0.39, green: 0.17, blue: 0.06),
+                        Color(red: 0.53, green: 0.28, blue: 0.10)
                     ],
-                    lightTint: Color(red: 1.00, green: 0.94, blue: 0.84),
-                    darkTint: Color(red: 1.00, green: 0.88, blue: 0.68),
-                    lightHighlight: Color(red: 1.00, green: 0.94, blue: 0.74),
-                    darkHighlight: Color(red: 1.00, green: 0.76, blue: 0.42),
-                    lightAmbient: Color(red: 0.99, green: 0.63, blue: 0.20),
-                    darkAmbient: Color(red: 0.68, green: 0.31, blue: 0.10)
+                    lightTint: Color(red: 1.00, green: 0.93, blue: 0.85),
+                    darkTint: Color(red: 0.98, green: 0.86, blue: 0.66),
+                    lightHighlight: Color(red: 1.00, green: 0.93, blue: 0.77),
+                    darkHighlight: Color(red: 0.96, green: 0.74, blue: 0.40),
+                    lightAmbient: Color(red: 0.92, green: 0.58, blue: 0.19),
+                    darkAmbient: Color(red: 0.62, green: 0.32, blue: 0.11)
                 )
             }
 
-            if normalized.contains("history") || normalized.contains("culture") || normalized.contains("philosophy") {
+            if normalized.contains("history") || normalized.contains("culture") || normalized.contains("philosophy") || normalized.contains("myth") || normalized.contains("architecture") {
                 return TopicVisualStyle(
                     symbolName: "building.columns.fill",
                     lightGradient: [
-                        Color(red: 0.53, green: 0.22, blue: 0.16),
-                        Color(red: 0.66, green: 0.33, blue: 0.21),
-                        Color(red: 0.89, green: 0.63, blue: 0.29)
+                        Color(red: 0.48, green: 0.26, blue: 0.16),
+                        Color(red: 0.61, green: 0.36, blue: 0.20),
+                        Color(red: 0.82, green: 0.62, blue: 0.34)
                     ],
                     darkGradient: [
-                        Color(red: 0.22, green: 0.10, blue: 0.08),
-                        Color(red: 0.28, green: 0.14, blue: 0.10),
-                        Color(red: 0.43, green: 0.24, blue: 0.12)
+                        Color(red: 0.19, green: 0.11, blue: 0.08),
+                        Color(red: 0.25, green: 0.15, blue: 0.10),
+                        Color(red: 0.38, green: 0.24, blue: 0.13)
                     ],
-                    lightTint: Color(red: 1.00, green: 0.93, blue: 0.86),
-                    darkTint: Color(red: 0.98, green: 0.83, blue: 0.65),
-                    lightHighlight: Color(red: 1.00, green: 0.91, blue: 0.78),
-                    darkHighlight: Color(red: 0.96, green: 0.72, blue: 0.48),
-                    lightAmbient: Color(red: 0.83, green: 0.51, blue: 0.24),
-                    darkAmbient: Color(red: 0.45, green: 0.24, blue: 0.14)
+                    lightTint: Color(red: 0.98, green: 0.92, blue: 0.86),
+                    darkTint: Color(red: 0.94, green: 0.81, blue: 0.66),
+                    lightHighlight: Color(red: 1.00, green: 0.91, blue: 0.80),
+                    darkHighlight: Color(red: 0.91, green: 0.70, blue: 0.49),
+                    lightAmbient: Color(red: 0.76, green: 0.50, blue: 0.25),
+                    darkAmbient: Color(red: 0.41, green: 0.25, blue: 0.15)
                 )
             }
 
-            if normalized.contains("science") || normalized.contains("physics") || normalized.contains("chemistry") || normalized.contains("space") {
+            if normalized.contains("science") || normalized.contains("physics") || normalized.contains("chemistry") || normalized.contains("space") || normalized.contains("neuro") || normalized.contains("marine") {
                 return TopicVisualStyle(
                     symbolName: "atom",
                     lightGradient: [
-                        Color(red: 0.18, green: 0.20, blue: 0.66),
-                        Color(red: 0.23, green: 0.26, blue: 0.86),
-                        Color(red: 0.21, green: 0.72, blue: 1.00)
+                        Color(red: 0.12, green: 0.26, blue: 0.67),
+                        Color(red: 0.14, green: 0.39, blue: 0.82),
+                        Color(red: 0.16, green: 0.73, blue: 0.92)
                     ],
                     darkGradient: [
-                        Color(red: 0.08, green: 0.08, blue: 0.30),
-                        Color(red: 0.10, green: 0.10, blue: 0.38),
-                        Color(red: 0.09, green: 0.28, blue: 0.61)
+                        Color(red: 0.06, green: 0.10, blue: 0.30),
+                        Color(red: 0.08, green: 0.14, blue: 0.39),
+                        Color(red: 0.08, green: 0.27, blue: 0.54)
                     ],
-                    lightTint: Color(red: 0.90, green: 0.92, blue: 1.00),
-                    darkTint: Color(red: 0.84, green: 0.84, blue: 1.00),
-                    lightHighlight: Color(red: 0.93, green: 0.95, blue: 1.00),
-                    darkHighlight: Color(red: 0.69, green: 0.77, blue: 1.00),
-                    lightAmbient: Color(red: 0.34, green: 0.47, blue: 1.00),
-                    darkAmbient: Color(red: 0.14, green: 0.20, blue: 0.72)
+                    lightTint: Color(red: 0.87, green: 0.94, blue: 1.00),
+                    darkTint: Color(red: 0.78, green: 0.87, blue: 1.00),
+                    lightHighlight: Color(red: 0.90, green: 0.97, blue: 1.00),
+                    darkHighlight: Color(red: 0.60, green: 0.82, blue: 1.00),
+                    lightAmbient: Color(red: 0.20, green: 0.62, blue: 0.88),
+                    darkAmbient: Color(red: 0.11, green: 0.33, blue: 0.58)
+                )
+            }
+
+            if normalized.contains("writing") || normalized.contains("communication") || normalized.contains("language") || normalized.contains("art") || normalized.contains("creative") || normalized.contains("public speaking") {
+                return TopicVisualStyle(
+                    symbolName: "text.book.closed.fill",
+                    lightGradient: [
+                        Color(red: 0.72, green: 0.24, blue: 0.34),
+                        Color(red: 0.88, green: 0.34, blue: 0.30),
+                        Color(red: 0.98, green: 0.58, blue: 0.31)
+                    ],
+                    darkGradient: [
+                        Color(red: 0.27, green: 0.09, blue: 0.13),
+                        Color(red: 0.40, green: 0.12, blue: 0.14),
+                        Color(red: 0.53, green: 0.19, blue: 0.14)
+                    ],
+                    lightTint: Color(red: 1.00, green: 0.91, blue: 0.87),
+                    darkTint: Color(red: 0.99, green: 0.80, blue: 0.68),
+                    lightHighlight: Color(red: 1.00, green: 0.92, blue: 0.84),
+                    darkHighlight: Color(red: 0.96, green: 0.68, blue: 0.52),
+                    lightAmbient: Color(red: 0.90, green: 0.38, blue: 0.30),
+                    darkAmbient: Color(red: 0.52, green: 0.19, blue: 0.15)
                 )
             }
 
             return TopicVisualStyle(
                 symbolName: "book.closed.fill",
                 lightGradient: [
-                    Color(red: 0.22, green: 0.28, blue: 0.82),
-                    Color(red: 0.28, green: 0.38, blue: 0.92),
-                    Color(red: 0.62, green: 0.50, blue: 0.95)
+                    Color(red: 0.32, green: 0.37, blue: 0.54),
+                    Color(red: 0.40, green: 0.47, blue: 0.64),
+                    Color(red: 0.56, green: 0.60, blue: 0.76)
                 ],
                 darkGradient: [
-                    Color(red: 0.11, green: 0.14, blue: 0.35),
-                    Color(red: 0.14, green: 0.18, blue: 0.42),
-                    Color(red: 0.23, green: 0.17, blue: 0.49)
+                    Color(red: 0.12, green: 0.15, blue: 0.24),
+                    Color(red: 0.16, green: 0.19, blue: 0.29),
+                    Color(red: 0.22, green: 0.25, blue: 0.36)
                 ],
-                lightTint: Color(red: 0.92, green: 0.93, blue: 1.00),
-                darkTint: Color(red: 0.82, green: 0.86, blue: 1.00),
-                lightHighlight: Color(red: 0.94, green: 0.95, blue: 1.00),
-                darkHighlight: Color(red: 0.70, green: 0.77, blue: 1.00),
-                lightAmbient: Color(red: 0.42, green: 0.48, blue: 1.00),
-                darkAmbient: Color(red: 0.18, green: 0.21, blue: 0.66)
+                lightTint: Color(red: 0.93, green: 0.95, blue: 1.00),
+                darkTint: Color(red: 0.82, green: 0.86, blue: 0.95),
+                lightHighlight: Color(red: 0.95, green: 0.97, blue: 1.00),
+                darkHighlight: Color(red: 0.72, green: 0.78, blue: 0.92),
+                lightAmbient: Color(red: 0.45, green: 0.52, blue: 0.72),
+                darkAmbient: Color(red: 0.20, green: 0.24, blue: 0.40)
             )
         }
     }

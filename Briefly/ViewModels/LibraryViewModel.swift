@@ -195,6 +195,10 @@ final class LibraryViewModel: ObservableObject {
 
         let backendClient = BrieflyBackendClient()
         let service = AIContentService(transport: backendClient, jobTransport: backendClient)
+        let poller = AIGenerationJobPoller(
+            service: service,
+            configuration: .init(timeout: .seconds(120))
+        )
 
         Self.logger.debug(
             "Surprise Me start: requestedTitle=\(requestedTitle, privacy: .public) targetSections=\(targetSections, privacy: .public) cardsPerSection=\(cardsPerSection, privacy: .public)"
@@ -217,83 +221,55 @@ final class LibraryViewModel: ObservableObject {
             throw error
         }
 
-        while true {
-            let status: AIGenerationJobStatus
-            do {
-                status = try await service.fetchTopicPackGenerationJobStatus(jobID: handle.id)
-            } catch {
-                logSurpriseMeError(error, stage: "job status")
-                throw error
-            }
+        let dto: TopicPackDTO
+        do {
+            dto = try await poller.awaitResult(handle: handle)
+            let dtoCounts = SurpriseMeAssembly.dtoCounts(dto)
+            Self.logger.debug(
+                "Surprise Me job result fetched: sections=\(dtoCounts.sections, privacy: .public) cards=\(dtoCounts.cards, privacy: .public)"
+            )
+        } catch {
+            logSurpriseMeError(error, stage: "job poll")
+            throw error
+        }
 
-            switch status.state {
-            case .queued:
-                Self.logger.debug("Surprise Me job queued: jobID=\(handle.id.rawValue, privacy: .public)")
+        let uniqueBase = makeUnique(dto: dto, existingIDs: existingIDs, existingTitles: existingTitles)
+        let baseID = uniqueBase.id
+        let sanitizedTitle = Self.sanitizedRandomTopicTitle(
+            generatedTitle: uniqueBase.title,
+            requestedTitle: requestedTitle
+        )
+        let baseTitle = Self.makeUniqueTitle(base: sanitizedTitle, existingTitles: existingTitles)
 
-            case .running:
-                Self.logger.debug("Surprise Me job running: jobID=\(handle.id.rawValue, privacy: .public)")
+        let normalizedDTO = normalize(
+            dto: uniqueBase,
+            baseID: baseID,
+            baseTitle: baseTitle,
+            sectionStartIndex: 0
+        )
+        let normalizedCounts = SurpriseMeAssembly.dtoCounts(normalizedDTO)
+        Self.logger.debug(
+            "Surprise Me normalized: id=\(normalizedDTO.id, privacy: .public) title=\(normalizedDTO.title, privacy: .public) sections=\(normalizedCounts.sections, privacy: .public) cards=\(normalizedCounts.cards, privacy: .public)"
+        )
 
-            case .completed:
-                Self.logger.debug("Surprise Me job completed: jobID=\(handle.id.rawValue, privacy: .public)")
+        Self.logger.debug("Surprise Me final validation start")
+        guard normalizedDTO.isValid() else {
+            let reason = SurpriseMeAssembly.validationFailureReason(for: normalizedDTO)
+            Self.logger.error("Surprise Me final DTO invalid: \(reason, privacy: .public)")
+            throw AIContentService.ServiceError.validationFailed(details: reason)
+        }
+        Self.logger.debug("Surprise Me final validation success")
 
-                let dto: TopicPackDTO
-                do {
-                    dto = try await service.fetchTopicPackGenerationJobResult(handle: handle)
-                    let dtoCounts = SurpriseMeAssembly.dtoCounts(dto)
-                    Self.logger.debug(
-                        "Surprise Me job result fetched: sections=\(dtoCounts.sections, privacy: .public) cards=\(dtoCounts.cards, privacy: .public)"
-                    )
-                } catch {
-                    logSurpriseMeError(error, stage: "job result")
-                    throw error
-                }
-
-                let uniqueBase = makeUnique(dto: dto, existingIDs: existingIDs, existingTitles: existingTitles)
-                let baseID = uniqueBase.id
-                let sanitizedTitle = Self.sanitizedRandomTopicTitle(
-                    generatedTitle: uniqueBase.title,
-                    requestedTitle: requestedTitle
-                )
-                let baseTitle = Self.makeUniqueTitle(base: sanitizedTitle, existingTitles: existingTitles)
-
-                let normalizedDTO = normalize(
-                    dto: uniqueBase,
-                    baseID: baseID,
-                    baseTitle: baseTitle,
-                    sectionStartIndex: 0
-                )
-                let normalizedCounts = SurpriseMeAssembly.dtoCounts(normalizedDTO)
-                Self.logger.debug(
-                    "Surprise Me normalized: id=\(normalizedDTO.id, privacy: .public) title=\(normalizedDTO.title, privacy: .public) sections=\(normalizedCounts.sections, privacy: .public) cards=\(normalizedCounts.cards, privacy: .public)"
-                )
-
-                Self.logger.debug("Surprise Me final validation start")
-                guard normalizedDTO.isValid() else {
-                    let reason = SurpriseMeAssembly.validationFailureReason(for: normalizedDTO)
-                    Self.logger.error("Surprise Me final DTO invalid: \(reason, privacy: .public)")
-                    throw AIContentService.ServiceError.validationFailed(details: reason)
-                }
-                Self.logger.debug("Surprise Me final validation success")
-
-                Self.logger.debug("Surprise Me persistence start")
-                do {
-                    let persisted = try await contentRepository.appendOrReplaceUserPack(normalizedDTO)
-                    Self.logger.debug("Surprise Me persistence success")
-                    return persisted
-                } catch {
-                    Self.logger.error(
-                        "Surprise Me persistence failed: classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
-                    )
-                    throw error
-                }
-
-            case .failed(let reason):
-                let error = BrieflyBackendClient.ClientError.jobFailed(reason: reason)
-                logSurpriseMeError(error, stage: "job failed")
-                throw error
-            }
-
-            try await Task.sleep(nanoseconds: 1_000_000_000)
+        Self.logger.debug("Surprise Me persistence start")
+        do {
+            let persisted = try await contentRepository.appendOrReplaceUserPack(normalizedDTO)
+            Self.logger.debug("Surprise Me persistence success")
+            return persisted
+        } catch {
+            Self.logger.error(
+                "Surprise Me persistence failed: classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
+            )
+            throw error
         }
     }
 
