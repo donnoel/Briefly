@@ -249,22 +249,28 @@ struct LibraryView: View {
 
     private var overviewSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("TODAY")
-                    .font(.caption.weight(.bold))
-                    .tracking(1.1)
-                    .foregroundColor(BrieflyTheme.Colors.accent)
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("DAILY MOMENTUM")
+                        .font(.caption.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundColor(BrieflyTheme.Colors.accent)
 
-                Text("Resume your momentum")
-                    .font(.system(.title2, design: .rounded).weight(.bold))
-                    .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                    Text("Keep your streak alive")
+                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
-                Text(hasAnyTopics
-                     ? "Continue where you left off, then explore a fresh topic when you're ready."
-                     : "Build your first topic pack and turn the library into a place worth returning to.")
-                    .font(.subheadline)
-                    .foregroundColor(BrieflyTheme.Colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(hasAnyTopics
+                         ? "Resume one in-progress topic, then discover one fresh idea."
+                         : "Create your first topic pack and make this your daily learning ritual.")
+                        .font(.subheadline)
+                        .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                momentumRing
             }
 
             HStack(spacing: 10) {
@@ -315,8 +321,8 @@ struct LibraryView: View {
                     LinearGradient(
                         colors: [
                             BrieflyTheme.Colors.cardBackground(colorScheme),
-                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.34 : 0.42),
-                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.32)
+                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.40 : 0.52),
+                            BrieflyTheme.Colors.libraryAmbientSecondary(colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.28)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -325,16 +331,23 @@ struct LibraryView: View {
                 .overlay(alignment: .topLeading) {
                     Circle()
                         .fill(BrieflyTheme.Colors.libraryAmbientSecondary(colorScheme))
-                        .frame(width: 130, height: 130)
-                        .blur(radius: 26)
-                        .offset(x: -20, y: -28)
+                        .frame(width: 150, height: 150)
+                        .blur(radius: 30)
+                        .offset(x: -24, y: -34)
                 }
                 .overlay(alignment: .topTrailing) {
                     Circle()
                         .fill(BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme))
-                        .frame(width: 190, height: 190)
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 30)
+                        .offset(x: 40, y: -48)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    Circle()
+                        .fill(BrieflyTheme.Colors.libraryAmbientTertiary(colorScheme))
+                        .frame(width: 120, height: 120)
                         .blur(radius: 28)
-                        .offset(x: 34, y: -44)
+                        .offset(x: 18, y: 24)
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -345,6 +358,53 @@ struct LibraryView: View {
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 8, leading: sectionHorizontalInset, bottom: 4, trailing: sectionHorizontalInset))
         .listRowBackground(Color.clear)
+    }
+
+    private var momentumProgress: Double {
+        guard viewModel.activeTopics.count > 0 else { return 0 }
+        let ratio = Double(viewModel.inProgressTopicCount) / Double(viewModel.activeTopics.count)
+        return min(max(ratio, 0), 1)
+    }
+
+    private var momentumRing: some View {
+        let lineWidth: CGFloat = 10
+        let percent = Int((momentumProgress * 100).rounded())
+
+        return VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .stroke(BrieflyTheme.Colors.progressTrack(colorScheme), lineWidth: lineWidth)
+                Circle()
+                    .trim(from: 0, to: max(0.04, momentumProgress))
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                BrieflyTheme.Colors.accent,
+                                BrieflyTheme.Colors.accentSecondary
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                VStack(spacing: 2) {
+                    Text("\(percent)%")
+                        .font(.system(.headline, design: .rounded).weight(.bold))
+                        .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                    Text("today")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                }
+            }
+            .frame(width: 74, height: 74)
+
+            Text("In progress")
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(BrieflyTheme.Colors.textSecondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Daily momentum \(percent) percent")
     }
 
     private var activeFiltersRow: some View {
