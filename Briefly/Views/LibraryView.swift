@@ -91,28 +91,6 @@ struct LibraryView: View {
             }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Menu {
-                    Button {
-                        if ProcessInfo.processInfo.arguments.contains("-uiTestUseCannedGeneratedPack") {
-                            cannedGeneratedReviewDTO = Self.uiTestCannedGeneratedPack()
-                        } else {
-                            showingAIGenerator = true
-                        }
-                    } label: {
-                        Label("Create Topic", systemImage: "plus.circle")
-                    }
-
-                    Button {
-                        Task { await generateRandomTopic() }
-                    } label: {
-                        Label("Surprise Me", systemImage: "dice")
-                    }
-                    .disabled(isGeneratingRandom)
-                } label: {
-                    toolbarChip(title: "Create", systemImage: "plus")
-                }
-                .accessibilityLabel("Create topic")
-
-                Menu {
                     if !viewModel.availableCategories.isEmpty {
                         Picker("Category", selection: $viewModel.selectedCategory) {
                             Text("All categories").tag(String?.none)
