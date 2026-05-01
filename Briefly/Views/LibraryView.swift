@@ -16,6 +16,7 @@ struct LibraryView: View {
     @State private var libraryCompactHeaderVisible = false
     @State private var cannedGeneratedReviewDTO: TopicPackDTO?
     @State private var hasAnimatedIn = false
+    @State private var showCarouselHint = false
 
     private let continueCardWidth: CGFloat = 320
     private let browseCardWidth: CGFloat = 280
@@ -72,6 +73,13 @@ struct LibraryView: View {
         .onAppear {
             guard !hasAnimatedIn else { return }
             hasAnimatedIn = true
+            showCarouselHint = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                withAnimation(.easeOut(duration: 0.35)) {
+                    showCarouselHint = false
+                }
+            }
         }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
@@ -499,18 +507,26 @@ struct LibraryView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .black, location: 0.04),
-                        .init(color: .black, location: 0.96),
-                        .init(color: .clear, location: 1)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .carouselEdgeFade(background: BrieflyTheme.Colors.cardBackground(colorScheme))
+            .overlay(alignment: .topTrailing) {
+                if showCarouselHint {
+                    Label("Swipe for more", systemImage: "arrow.left.and.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(BrieflyTheme.Colors.elevatedBackground(colorScheme))
+                                .overlay(
+                                    Capsule()
+                                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
+                                )
+                        )
+                        .padding(.top, 8)
+                        .transition(.opacity.combined(with: .scale))
+                }
+            }
         }
         .padding(18)
         .background(continueSectionShell)
@@ -561,6 +577,7 @@ struct LibraryView: View {
                         }
                         .padding(.vertical, 2)
                     }
+                    .carouselEdgeFade(background: BrieflyTheme.Colors.cardBackground(colorScheme))
                 }
                 .padding(16)
                 .background(sectionShell(accent: style.ambient(for: colorScheme)))
@@ -1159,6 +1176,27 @@ private struct MotionRevealModifier: ViewModifier {
 private extension View {
     func motionReveal(active: Bool, order: Int) -> some View {
         modifier(MotionRevealModifier(active: active, order: order))
+    }
+
+    func carouselEdgeFade(background: Color) -> some View {
+        overlay(alignment: .leading) {
+            LinearGradient(
+                colors: [background, background.opacity(0)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 18)
+            .allowsHitTesting(false)
+        }
+        .overlay(alignment: .trailing) {
+            LinearGradient(
+                colors: [background.opacity(0), background],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 18)
+            .allowsHitTesting(false)
+        }
     }
 }
 
