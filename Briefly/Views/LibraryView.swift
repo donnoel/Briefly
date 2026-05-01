@@ -15,6 +15,7 @@ struct LibraryView: View {
     @State private var libraryError: String?
     @State private var libraryCompactHeaderVisible = false
     @State private var cannedGeneratedReviewDTO: TopicPackDTO?
+    @State private var hasAnimatedIn = false
 
     private let continueCardWidth: CGFloat = 320
     private let browseCardWidth: CGFloat = 280
@@ -24,17 +25,21 @@ struct LibraryView: View {
     var body: some View {
         List {
             overviewSection
+                .motionReveal(active: hasAnimatedIn, order: 0)
 
             if hasActiveFilters {
                 activeFiltersRow
+                    .motionReveal(active: hasAnimatedIn, order: 1)
             }
 
             if !viewModel.continueLearningTopics.isEmpty {
                 continueLearningSection
+                    .motionReveal(active: hasAnimatedIn, order: 2)
             }
 
             if !viewModel.exploreTopicGroups.isEmpty {
                 exploreSection
+                    .motionReveal(active: hasAnimatedIn, order: 3)
             }
 
             if !viewModel.completedTopics.isEmpty {
@@ -48,6 +53,7 @@ struct LibraryView: View {
                         subtitle: "Finished topics stay handy for refreshers and review."
                     )
                 }
+                .motionReveal(active: hasAnimatedIn, order: 4)
             }
         }
         .listStyle(.plain)
@@ -62,6 +68,10 @@ struct LibraryView: View {
             if shouldShowCompactHeader != libraryCompactHeaderVisible {
                 libraryCompactHeaderVisible = shouldShowCompactHeader
             }
+        }
+        .onAppear {
+            guard !hasAnimatedIn else { return }
+            hasAnimatedIn = true
         }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
@@ -1043,6 +1053,29 @@ struct LibraryView: View {
         .scaleEffect(libraryCompactHeaderVisible ? 1 : 0.98)
         .animation(.easeInOut(duration: 0.2), value: libraryCompactHeaderVisible)
         .accessibilityHidden(!libraryCompactHeaderVisible)
+    }
+}
+
+private struct MotionRevealModifier: ViewModifier {
+    let active: Bool
+    let order: Int
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(active ? 1 : 0)
+            .offset(y: active ? 0 : 14)
+            .scaleEffect(active ? 1 : 0.985, anchor: .top)
+            .animation(
+                .spring(response: 0.52, dampingFraction: 0.86)
+                    .delay(Double(order) * 0.04),
+                value: active
+            )
+    }
+}
+
+private extension View {
+    func motionReveal(active: Bool, order: Int) -> some View {
+        modifier(MotionRevealModifier(active: active, order: order))
     }
 }
 
