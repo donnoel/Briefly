@@ -91,12 +91,11 @@ struct TopicCardView: View {
     }
 
     private var showsCategoryChip: Bool {
-        switch variant {
-        case .standard:
-            return false
-        case .continueLearning, .featured:
-            return true
-        }
+        variant == .featured
+    }
+
+    private var showsHeader: Bool {
+        showsCategoryChip || showsActionChip
     }
 
     private var metadataFont: Font {
@@ -104,7 +103,7 @@ struct TopicCardView: View {
         case .featured:
             return .system(.caption, design: .rounded).weight(.semibold)
         case .continueLearning, .standard:
-            return .system(.caption2, design: .rounded).weight(.semibold)
+            return .system(.caption2, design: .rounded).weight(.medium)
         }
     }
 
@@ -142,7 +141,7 @@ struct TopicCardView: View {
         case .featured:
             return 98
         case .continueLearning, .standard:
-            return 84
+            return 96
         }
     }
 
@@ -151,7 +150,7 @@ struct TopicCardView: View {
         case .featured:
             return 38
         case .continueLearning, .standard:
-            return 34
+            return 32
         }
     }
 
@@ -173,10 +172,17 @@ struct TopicCardView: View {
             decorativeSymbol
 
             VStack(alignment: .leading, spacing: verticalSpacing) {
-                header
+                if showsHeader {
+                    header
+                }
 
                 titleBlock
-                    .frame(maxWidth: .infinity, minHeight: titleAreaHeight, maxHeight: titleAreaHeight, alignment: .topLeading)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: titleAreaHeight,
+                        maxHeight: titleAreaHeight,
+                        alignment: .topLeading
+                    )
 
                 metadata
                     .frame(height: metadataHeight, alignment: .leading)
@@ -269,28 +275,33 @@ struct TopicCardView: View {
         }
     }
 
+    @ViewBuilder
     private var metadata: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: variant == .featured ? 8 : 6) {
             statTile(
                 title: topic.difficulty.rawValue,
                 icon: "dial.medium",
-                fillColor: Color.white.opacity(colorScheme == .dark ? 0.10 : 0.12),
+                fillColor: primaryMetadataFill,
                 foregroundColor: cardPrimaryText,
-                strokeColor: Color.white.opacity(0.08)
+                strokeColor: primaryMetadataStroke
             )
-            statTile(
-                title: "\(topic.sections.count) sections",
-                icon: "square.grid.2x2",
-                fillColor: Color.black.opacity(colorScheme == .dark ? 0.06 : 0.08),
-                foregroundColor: cardSecondaryText,
-                strokeColor: Color.white.opacity(0.06)
-            )
+
+            if variant == .featured {
+                statTile(
+                    title: "\(topic.sections.count) sections",
+                    icon: "square.grid.2x2",
+                    fillColor: secondaryMetadataFill,
+                    foregroundColor: cardSecondaryText,
+                    strokeColor: secondaryMetadataStroke
+                )
+            }
+
             statTile(
                 title: "\(cardCount) cards",
                 icon: "rectangle.stack.fill",
-                fillColor: Color.black.opacity(colorScheme == .dark ? 0.06 : 0.08),
+                fillColor: secondaryMetadataFill,
                 foregroundColor: cardSecondaryText,
-                strokeColor: Color.white.opacity(0.06)
+                strokeColor: secondaryMetadataStroke
             )
         }
         .accessibilityElement(children: .combine)
@@ -319,11 +330,15 @@ struct TopicCardView: View {
                 .clipShape(Capsule())
 
             if variant == .featured {
-                Text(progress > 0 ? "Pick up where you left off across sections and cards." : "Start exploring this topic with a fresh study session.")
-                    .font(.caption)
-                    .foregroundColor(cardSecondaryText)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(
+                    progress > 0
+                    ? "Pick up where you left off across sections and cards."
+                    : "Start exploring this topic with a fresh study session."
+                )
+                .font(.caption)
+                .foregroundColor(cardSecondaryText)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -389,19 +404,16 @@ struct TopicCardView: View {
 
     private var decorativeSymbol: some View {
         Group {
-            if isEmphasized {
+            if variant == .featured {
                 ZStack {
                     Circle()
-                        .fill(style.ambient(for: colorScheme).opacity(variant == .featured ? 0.24 : 0.16))
-                        .frame(
-                            width: variant == .featured ? 220 : 136,
-                            height: variant == .featured ? 220 : 136
-                        )
-                        .blur(radius: variant == .featured ? 24 : 16)
+                        .fill(style.ambient(for: colorScheme).opacity(0.24))
+                        .frame(width: 220, height: 220)
+                        .blur(radius: 24)
 
                     Image(systemName: style.symbolName)
                         .font(.system(
-                            size: variant == .featured ? 96 : 54,
+                            size: 96,
                             weight: .semibold,
                             design: .rounded
                         ))
@@ -415,10 +427,10 @@ struct TopicCardView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .opacity(variant == .featured ? 0.12 : 0.08)
+                        .opacity(0.12)
                 }
-                .padding(.top, variant == .featured ? -26 : -4)
-                .padding(.trailing, variant == .featured ? -20 : -2)
+                .padding(.top, -26)
+                .padding(.trailing, -20)
             }
         }
         .allowsHitTesting(false)
@@ -426,7 +438,13 @@ struct TopicCardView: View {
     }
 
     private var accessibilityLabel: String {
-        var parts: [String] = [topic.title, topic.subtitle, topic.difficulty.rawValue, "\(topic.sections.count) sections", "\(cardCount) cards"]
+        var parts: [String] = [topic.title, topic.subtitle, topic.difficulty.rawValue]
+
+        if variant == .featured {
+            parts.append("\(topic.sections.count) sections")
+        }
+
+        parts.append("\(cardCount) cards")
 
         if progress > 0 {
             parts.append("\(progressPercent) percent complete")
@@ -435,6 +453,26 @@ struct TopicCardView: View {
         }
 
         return parts.joined(separator: ", ")
+    }
+
+    private var primaryMetadataFill: Color {
+        variant == .featured
+            ? Color.white.opacity(colorScheme == .dark ? 0.10 : 0.12)
+            : Color.white.opacity(colorScheme == .dark ? 0.08 : 0.10)
+    }
+
+    private var secondaryMetadataFill: Color {
+        variant == .featured
+            ? Color.black.opacity(colorScheme == .dark ? 0.06 : 0.08)
+            : Color.black.opacity(colorScheme == .dark ? 0.05 : 0.06)
+    }
+
+    private var primaryMetadataStroke: Color {
+        Color.white.opacity(variant == .featured ? 0.08 : 0.05)
+    }
+
+    private var secondaryMetadataStroke: Color {
+        Color.white.opacity(variant == .featured ? 0.06 : 0.04)
     }
 
     private var cardPrimaryText: Color {
@@ -450,9 +488,9 @@ struct TopicCardView: View {
     }
 
     private func statTile(title: String, icon: String, fillColor: Color, foregroundColor: Color, strokeColor: Color) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: variant == .featured ? 11 : 10, weight: .semibold))
+                .font(.system(size: variant == .featured ? 11 : 9, weight: .medium))
 
             Text(title)
                 .lineLimit(1)
@@ -461,13 +499,13 @@ struct TopicCardView: View {
         .font(metadataFont)
         .foregroundColor(foregroundColor)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, variant == .featured ? 10 : 9)
-        .padding(.vertical, variant == .featured ? 9 : 8)
+        .padding(.horizontal, variant == .featured ? 10 : 8)
+        .padding(.vertical, variant == .featured ? 9 : 7)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(fillColor)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .stroke(strokeColor)
                 )
         )

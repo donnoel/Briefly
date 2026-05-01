@@ -19,6 +19,7 @@ struct LibraryView: View {
     private let continueCardWidth: CGFloat = 320
     private let browseCardWidth: CGFloat = 280
     private let sectionHorizontalInset: CGFloat = 16
+    private let sectionSpacing: CGFloat = 16
 
     var body: some View {
         List {
@@ -31,7 +32,6 @@ struct LibraryView: View {
             if !viewModel.continueLearningTopics.isEmpty {
                 continueLearningSection
             }
-
 
             if !viewModel.exploreTopicGroups.isEmpty {
                 exploreSection
@@ -51,7 +51,7 @@ struct LibraryView: View {
             }
         }
         .listStyle(.plain)
-        .listSectionSpacing(18)
+        .listSectionSpacing(sectionSpacing)
         .coordinateSpace(name: "libraryScroll")
         .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.25), value: viewModel.activeTopics.count)
@@ -124,7 +124,10 @@ struct LibraryView: View {
                         Label("Models", systemImage: "gearshape")
                     }
                 } label: {
-                    toolbarChip(title: "Filter", systemImage: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    toolbarChip(
+                        title: "Filter",
+                        systemImage: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                    )
                 }
                 .accessibilityLabel("Filter topics")
             }
@@ -210,43 +213,48 @@ struct LibraryView: View {
     @ViewBuilder
     private func topicRow(_ topic: TopicPack) -> some View {
         libraryTopicButton(topic, variant: .standard)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-        .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
-        .transition(.asymmetric(
-            insertion: .opacity.combined(with: .move(edge: .top)),
-            removal: .opacity.combined(with: .move(edge: .bottom))
-        ))
-        .swipeActions(edge: .leading) {
-            Button {
-                withAnimation {
-                    viewModel.toggleCompleted(topic)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 6, leading: sectionHorizontalInset, bottom: 6, trailing: sectionHorizontalInset))
+            .listRowBackground(BrieflyTheme.Colors.background(colorScheme))
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .move(edge: .top)),
+                removal: .opacity.combined(with: .move(edge: .bottom))
+            ))
+            .swipeActions(edge: .leading) {
+                Button {
+                    withAnimation {
+                        viewModel.toggleCompleted(topic)
+                    }
+                } label: {
+                    Label(viewModel.isCompleted(topic) ? "Mark Incomplete" : "Mark Complete", systemImage: "checkmark.seal")
                 }
-            } label: {
-                Label(viewModel.isCompleted(topic) ? "Mark Incomplete" : "Mark Complete", systemImage: "checkmark.seal")
+                .tint(.green)
             }
-            .tint(.green)
-        }
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) {
-                Task {
-                    do {
-                        try await viewModel.delete(topic)
-                    } catch {
-                        await MainActor.run {
-                            libraryError = error.localizedDescription
+            .swipeActions(edge: .trailing) {
+                Button(role: .destructive) {
+                    Task {
+                        do {
+                            try await viewModel.delete(topic)
+                        } catch {
+                            await MainActor.run {
+                                libraryError = error.localizedDescription
+                            }
                         }
                     }
+                } label: {
+                    Label("Delete", systemImage: "trash")
                 }
-            } label: {
-                Label("Delete", systemImage: "trash")
             }
-        }
     }
 
     private var overviewSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("TODAY")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.1)
+                    .foregroundColor(BrieflyTheme.Colors.accent)
+
                 Text("Resume your momentum")
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .foregroundColor(BrieflyTheme.Colors.textPrimary)
@@ -259,13 +267,39 @@ struct LibraryView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            HStack(spacing: 10) {
+                Button {
+                    showingAIGenerator = true
+                } label: {
+                    overviewActionButton(
+                        title: "Create Topic",
+                        systemImage: "plus.circle.fill",
+                        style: .primary
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Task { await generateRandomTopic() }
+                } label: {
+                    overviewActionButton(
+                        title: "Surprise Me",
+                        systemImage: "dice.fill",
+                        style: .secondary
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isGeneratingRandom)
+                .opacity(isGeneratingRandom ? 0.6 : 1)
+            }
+
             HStack(spacing: 12) {
                 insightPill(title: "Active", value: "\(viewModel.activeTopics.count)")
-                insightPill(title: "In Progress", value: "\(viewModel.inProgressTopicCount)")
+                insightPill(title: "Studying", value: "\(viewModel.inProgressTopicCount)")
                 insightPill(title: "Completed", value: "\(viewModel.completedTopics.count)")
             }
         }
-        .padding(20)
+        .padding(22)
         .background(
             GeometryReader { geometry in
                 Color.clear
@@ -276,38 +310,46 @@ struct LibraryView: View {
             }
         )
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
                             BrieflyTheme.Colors.cardBackground(colorScheme),
-                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.46 : 0.80)
+                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.34 : 0.42),
+                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.32)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
+                .overlay(alignment: .topLeading) {
+                    Circle()
+                        .fill(BrieflyTheme.Colors.libraryAmbientSecondary(colorScheme))
+                        .frame(width: 130, height: 130)
+                        .blur(radius: 26)
+                        .offset(x: -20, y: -28)
+                }
                 .overlay(alignment: .topTrailing) {
                     Circle()
                         .fill(BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme))
-                        .frame(width: 140, height: 140)
-                        .blur(radius: 18)
-                        .offset(x: 26, y: -30)
+                        .frame(width: 190, height: 190)
+                        .blur(radius: 28)
+                        .offset(x: 34, y: -44)
                 }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
                         .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
                 )
-                .shadow(color: BrieflyTheme.Colors.shadowSoft(colorScheme), radius: 14, x: 0, y: 10)
+                .shadow(color: BrieflyTheme.Colors.shadowSoft(colorScheme), radius: 18, x: 0, y: 12)
         )
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 2, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 8, leading: sectionHorizontalInset, bottom: 4, trailing: sectionHorizontalInset))
         .listRowBackground(Color.clear)
     }
 
     private var activeFiltersRow: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Filtered Results")
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Active Filters")
                 .font(.footnote.weight(.semibold))
                 .foregroundColor(.secondary)
 
@@ -337,56 +379,57 @@ struct LibraryView: View {
             }
         }
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 2, leading: sectionHorizontalInset, bottom: 6, trailing: sectionHorizontalInset))
         .listRowBackground(Color.clear)
     }
 
     private var continueLearningSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             sectionHeader(
                 title: "Continue",
                 subtitle: "Recent and in-progress topics stay front and center."
             )
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 16) {
+                LazyHStack(spacing: 18) {
                     ForEach(viewModel.continueLearningTopics) { topic in
                         libraryTopicButton(topic, variant: .continueLearning)
                             .frame(width: continueCardWidth, height: 220)
                     }
                 }
-                .padding(.vertical, 1)
+                .padding(.vertical, 2)
             }
         }
+        .padding(18)
+        .background(sectionShell(accent: BrieflyTheme.Colors.libraryAmbientPrimary(colorScheme)))
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 3, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 8, leading: sectionHorizontalInset, bottom: 6, trailing: sectionHorizontalInset))
         .listRowBackground(Color.clear)
     }
 
-
     private var exploreSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             sectionHeader(
                 title: "Browse Topics",
                 subtitle: "Browse by category instead of scrolling one long list."
             )
 
             ForEach(viewModel.exploreTopicGroups) { group in
+                let style = BrieflyTheme.Colors.topicStyle(for: group.title)
+
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        let style = BrieflyTheme.Colors.topicStyle(for: group.title)
-
                         Label(group.title, systemImage: style.symbolName)
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(BrieflyTheme.Colors.textPrimary)
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
+                            .padding(.vertical, 8)
                             .background(
                                 Capsule()
-                                    .fill(style.ambient(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.12))
+                                    .fill(style.ambient(for: colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.10))
                                     .overlay(
                                         Capsule()
-                                            .stroke(style.highlight(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.16))
+                                            .stroke(style.highlight(for: colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.12))
                                     )
                             )
 
@@ -398,24 +441,26 @@ struct LibraryView: View {
                     }
 
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 14) {
+                        LazyHStack(spacing: 16) {
                             ForEach(group.topics) { topic in
                                 libraryTopicButton(topic, variant: .standard)
                                     .frame(width: browseCardWidth, height: 220)
                             }
                         }
-                        .padding(.vertical, 1)
+                        .padding(.vertical, 2)
                     }
                 }
+                .padding(16)
+                .background(sectionShell(accent: style.ambient(for: colorScheme)))
             }
         }
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 5, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 6, leading: sectionHorizontalInset, bottom: 8, trailing: sectionHorizontalInset))
         .listRowBackground(Color.clear)
     }
 
     private func sectionHeader(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(title)
                 .font(.system(.title3, design: .rounded).weight(.bold))
                 .foregroundColor(BrieflyTheme.Colors.textPrimary)
@@ -425,7 +470,7 @@ struct LibraryView: View {
                 .foregroundColor(BrieflyTheme.Colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.bottom, 2)
+        .padding(.bottom, 1)
     }
 
     private func listSectionHeader(title: String, subtitle: String) -> some View {
@@ -442,29 +487,35 @@ struct LibraryView: View {
     }
 
     private func insightPill(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let isEmpty = value == "0"
+
+        return VStack(alignment: .leading, spacing: 4) {
             Text(value)
                 .font(.headline.weight(.bold))
-                .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                .foregroundColor(BrieflyTheme.Colors.textPrimary.opacity(isEmpty ? 0.72 : 1))
 
             Text(title)
                 .font(.caption)
-                .foregroundColor(BrieflyTheme.Colors.textSecondary)
+                .foregroundColor(BrieflyTheme.Colors.textSecondary.opacity(isEmpty ? 0.82 : 1))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
                             BrieflyTheme.Colors.elevatedBackground(colorScheme),
-                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.24)
+                            BrieflyTheme.Colors.accentSoft(colorScheme).opacity(isEmpty ? (colorScheme == .dark ? 0.08 : 0.10) : (colorScheme == .dark ? 0.14 : 0.18))
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
                 )
         )
     }
@@ -528,7 +579,7 @@ struct LibraryView: View {
         case .continueLearning:
             return continueCardWidth
         case .featured:
-            return 0
+            return continueCardWidth
         }
     }
 
@@ -545,15 +596,105 @@ struct LibraryView: View {
         Label(title, systemImage: systemImage)
             .font(.subheadline.weight(.semibold))
             .foregroundColor(BrieflyTheme.Colors.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
             .background(
                 Capsule()
-                    .fill(.ultraThinMaterial)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(colorScheme == .dark ? 0.10 : 0.74),
+                                BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.10 : 0.16)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .overlay(
                         Capsule()
                             .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
                     )
+            )
+            .shadow(color: BrieflyTheme.Colors.shadowSoft(colorScheme), radius: 6, x: 0, y: 3)
+    }
+
+    private func overviewActionButton(title: String, systemImage: String, style: OverviewActionStyle) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+        }
+        .foregroundColor(style == .primary ? .white : BrieflyTheme.Colors.textPrimary)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    style == .primary
+                    ? AnyShapeStyle(
+                        LinearGradient(
+                            colors: [
+                                BrieflyTheme.Colors.accent,
+                                BrieflyTheme.Colors.accent.opacity(0.82)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    : AnyShapeStyle(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(colorScheme == .dark ? 0.10 : 0.62),
+                                BrieflyTheme.Colors.accentSoft(colorScheme).opacity(colorScheme == .dark ? 0.10 : 0.14)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(
+                            style == .primary
+                            ? Color.white.opacity(0.10)
+                            : BrieflyTheme.Colors.cardStroke(colorScheme)
+                        )
+                )
+        )
+        .shadow(
+            color: style == .primary ? BrieflyTheme.Colors.accent.opacity(0.18) : BrieflyTheme.Colors.shadowSoft(colorScheme),
+            radius: style == .primary ? 10 : 6,
+            x: 0,
+            y: style == .primary ? 6 : 3
+        )
+    }
+
+    private func sectionShell(accent: Color) -> some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        BrieflyTheme.Colors.cardBackground(colorScheme).opacity(colorScheme == .dark ? 0.94 : 0.96),
+                        accent.opacity(colorScheme == .dark ? 0.08 : 0.06)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(alignment: .topTrailing) {
+                Circle()
+                    .fill(accent.opacity(colorScheme == .dark ? 0.10 : 0.08))
+                    .frame(width: 120, height: 120)
+                    .blur(radius: 22)
+                    .offset(x: 20, y: -20)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
             )
     }
 
@@ -833,9 +974,13 @@ struct LibraryView: View {
         .background(
             Capsule()
                 .fill(.ultraThinMaterial)
+                .overlay(
+                    Capsule()
+                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
+                )
         )
         .opacity(libraryCompactHeaderVisible ? 1 : 0)
-        .scaleEffect(libraryCompactHeaderVisible ? 1 : 0.96)
+        .scaleEffect(libraryCompactHeaderVisible ? 1 : 0.98)
         .animation(.easeInOut(duration: 0.2), value: libraryCompactHeaderVisible)
         .accessibilityHidden(!libraryCompactHeaderVisible)
     }
@@ -847,4 +992,9 @@ private struct LibraryOverviewOffsetKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
+}
+
+private enum OverviewActionStyle {
+    case primary
+    case secondary
 }
