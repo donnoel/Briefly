@@ -77,9 +77,9 @@ enum BrieflyTheme {
         // MARK: - Accents
 
         static let accent = Color(
-            red: 0.32,
-            green: 0.42,
-            blue: 0.96
+            red: 0.98,
+            green: 0.44,
+            blue: 0.26
         )
 
         static func accentSoft(_ scheme: ColorScheme) -> Color {
@@ -92,9 +92,9 @@ enum BrieflyTheme {
         }
 
         static let accentSecondary = Color(
-            red: 0.55,
-            green: 0.40,
-            blue: 0.95
+            red: 0.10,
+            green: 0.74,
+            blue: 0.66
         )
 
         static func shadowSoft(_ scheme: ColorScheme) -> Color {
@@ -257,7 +257,7 @@ enum BrieflyTheme {
             case .dark:
                 return accentSecondary.opacity(0.18)
             default:
-                return Color(red: 0.40, green: 0.54, blue: 1.0).opacity(0.12)
+                return Color(red: 0.16, green: 0.72, blue: 0.86).opacity(0.13)
             }
         }
 
@@ -266,7 +266,7 @@ enum BrieflyTheme {
             case .dark:
                 return Color(red: 0.08, green: 0.65, blue: 0.60).opacity(0.12)
             default:
-                return Color(red: 0.16, green: 0.80, blue: 0.74).opacity(0.10)
+                return Color(red: 0.99, green: 0.72, blue: 0.30).opacity(0.11)
             }
         }
 
@@ -275,7 +275,7 @@ enum BrieflyTheme {
             case .dark:
                 return Color(red: 0.95, green: 0.53, blue: 0.28).opacity(0.08)
             default:
-                return Color(red: 0.95, green: 0.55, blue: 0.28).opacity(0.08)
+                return Color(red: 0.98, green: 0.40, blue: 0.50).opacity(0.09)
             }
         }
 
@@ -308,14 +308,14 @@ enum BrieflyTheme {
                 return TopicVisualStyle(
                     symbolName: "gearshape.2.fill",
                     lightGradient: [
-                        Color(red: 0.05, green: 0.23, blue: 0.58),
-                        Color(red: 0.08, green: 0.34, blue: 0.78),
-                        Color(red: 0.24, green: 0.60, blue: 0.95)
+                        Color(red: 0.04, green: 0.22, blue: 0.66),
+                        Color(red: 0.08, green: 0.44, blue: 0.88),
+                        Color(red: 0.19, green: 0.69, blue: 0.98)
                     ],
                     darkGradient: [
-                        Color(red: 0.03, green: 0.10, blue: 0.26),
-                        Color(red: 0.05, green: 0.15, blue: 0.35),
-                        Color(red: 0.08, green: 0.25, blue: 0.55)
+                        Color(red: 0.03, green: 0.10, blue: 0.30),
+                        Color(red: 0.05, green: 0.18, blue: 0.42),
+                        Color(red: 0.08, green: 0.31, blue: 0.62)
                     ],
                     lightTint: Color(red: 0.85, green: 0.92, blue: 1.00),
                     darkTint: Color(red: 0.70, green: 0.84, blue: 1.00),
@@ -396,21 +396,21 @@ enum BrieflyTheme {
                 return TopicVisualStyle(
                     symbolName: "text.book.closed.fill",
                     lightGradient: [
-                        Color(red: 0.54, green: 0.26, blue: 0.62),
-                        Color(red: 0.67, green: 0.31, blue: 0.66),
-                        Color(red: 0.86, green: 0.46, blue: 0.62)
+                        Color(red: 0.72, green: 0.24, blue: 0.34),
+                        Color(red: 0.88, green: 0.34, blue: 0.30),
+                        Color(red: 0.98, green: 0.58, blue: 0.31)
                     ],
                     darkGradient: [
-                        Color(red: 0.22, green: 0.11, blue: 0.28),
-                        Color(red: 0.29, green: 0.14, blue: 0.32),
-                        Color(red: 0.41, green: 0.18, blue: 0.34)
+                        Color(red: 0.27, green: 0.09, blue: 0.13),
+                        Color(red: 0.40, green: 0.12, blue: 0.14),
+                        Color(red: 0.53, green: 0.19, blue: 0.14)
                     ],
-                    lightTint: Color(red: 0.98, green: 0.90, blue: 0.97),
-                    darkTint: Color(red: 0.91, green: 0.78, blue: 0.94),
-                    lightHighlight: Color(red: 1.00, green: 0.92, blue: 0.98),
-                    darkHighlight: Color(red: 0.88, green: 0.68, blue: 0.90),
-                    lightAmbient: Color(red: 0.77, green: 0.35, blue: 0.67),
-                    darkAmbient: Color(red: 0.40, green: 0.18, blue: 0.36)
+                    lightTint: Color(red: 1.00, green: 0.91, blue: 0.87),
+                    darkTint: Color(red: 0.99, green: 0.80, blue: 0.68),
+                    lightHighlight: Color(red: 1.00, green: 0.92, blue: 0.84),
+                    darkHighlight: Color(red: 0.96, green: 0.68, blue: 0.52),
+                    lightAmbient: Color(red: 0.90, green: 0.38, blue: 0.30),
+                    darkAmbient: Color(red: 0.52, green: 0.19, blue: 0.15)
                 )
             }
 
