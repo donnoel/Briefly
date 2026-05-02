@@ -67,6 +67,7 @@ struct DeckView: View {
 
                 studyStatsView
                     .padding(.horizontal, 20)
+                    .padding(.top, 2)
             } else {
                 completionView
             }
@@ -433,6 +434,8 @@ struct DeckView: View {
                         .stroke(BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.55))
                 )
         )
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var completionPerformanceLine: String {
