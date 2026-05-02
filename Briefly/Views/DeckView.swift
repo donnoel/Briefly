@@ -43,7 +43,7 @@ struct DeckView: View {
     }
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             headerView
 
             if let card = viewModel.currentCard {
@@ -265,20 +265,20 @@ struct DeckView: View {
     }
 
     private var answerFeedbackPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(viewModel.wasSelectedAnswerCorrect ? "Correct" : "Not quite")
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.bold))
                 .foregroundColor(viewModel.wasSelectedAnswerCorrect ? .green : .red)
 
             if let correctAnswer = viewModel.currentAnswerOptions.first(where: \.isCorrect)?.text {
                 Text("Correct answer: \(correctAnswer)")
-                    .font(.footnote)
-                    .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                    .font(.footnote.weight(.medium))
+                    .foregroundColor(BrieflyTheme.Colors.textPrimary.opacity(0.86))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.92))
@@ -313,7 +313,7 @@ struct DeckView: View {
                             )
                             .overlay(
                                 Circle()
-                                    .stroke(markerStrokeColor(for: option), lineWidth: 1)
+                                    .stroke(markerStrokeColor(for: option), lineWidth: 1.15)
                             )
 
                         Text(option.text)
@@ -332,8 +332,8 @@ struct DeckView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 13)
                     .background(answerBackground(for: option))
                 }
                 .buttonStyle(QuizOptionButtonStyle())
@@ -349,25 +349,25 @@ struct DeckView: View {
 
         if viewModel.hasSubmittedCurrentQuestion {
             if option.isCorrect {
-                strokeColor = Color.green.opacity(0.55)
-                fillColor = Color.green.opacity(colorScheme == .dark ? 0.18 : 0.1)
+                strokeColor = Color.green.opacity(0.62)
+                fillColor = Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
             } else if viewModel.selectedAnswerID == option.id {
-                strokeColor = Color.red.opacity(0.55)
-                fillColor = Color.red.opacity(colorScheme == .dark ? 0.18 : 0.1)
+                strokeColor = Color.red.opacity(0.62)
+                fillColor = Color.red.opacity(colorScheme == .dark ? 0.2 : 0.12)
             } else {
                 strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.65)
                 fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.75)
             }
         } else {
-            strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.95)
-            fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.95)
+            strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme)
+            fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.97)
         }
 
         return RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(fillColor)
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(strokeColor, lineWidth: 1)
+                    .stroke(strokeColor, lineWidth: 1.15)
             )
             .shadow(
                 color: BrieflyTheme.Colors.shadowSoft(colorScheme).opacity(viewModel.hasSubmittedCurrentQuestion ? 0.14 : 0.22),
@@ -380,25 +380,25 @@ struct DeckView: View {
     private func markerFillColor(for option: DeckSessionViewModel.QuizOption) -> Color {
         if viewModel.hasSubmittedCurrentQuestion {
             if option.isCorrect {
-                return Color.green.opacity(colorScheme == .dark ? 0.24 : 0.14)
+                return Color.green.opacity(colorScheme == .dark ? 0.3 : 0.18)
             }
             if viewModel.selectedAnswerID == option.id {
-                return Color.red.opacity(colorScheme == .dark ? 0.24 : 0.14)
+                return Color.red.opacity(colorScheme == .dark ? 0.3 : 0.18)
             }
         }
-        return BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.95)
+        return BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.98)
     }
 
     private func markerStrokeColor(for option: DeckSessionViewModel.QuizOption) -> Color {
         if viewModel.hasSubmittedCurrentQuestion {
             if option.isCorrect {
-                return Color.green.opacity(0.65)
+                return Color.green.opacity(0.7)
             }
             if viewModel.selectedAnswerID == option.id {
-                return Color.red.opacity(0.65)
+                return Color.red.opacity(0.7)
             }
         }
-        return BrieflyTheme.Colors.cardStroke(colorScheme)
+        return BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.9)
     }
 
     private func markerTextColor(for option: DeckSessionViewModel.QuizOption) -> Color {
@@ -417,20 +417,20 @@ struct DeckView: View {
         HStack(spacing: 0) {
             studyMetric(title: "Question", value: "\(currentCardNumber)")
             Divider()
-                .padding(.vertical, 10)
+                .padding(.vertical, 6)
             studyMetric(title: "Correct", value: "\(viewModel.correctAnswerCount)")
             Divider()
-                .padding(.vertical, 10)
+                .padding(.vertical, 6)
             studyMetric(title: "Accuracy", value: "\(viewModel.scorePercent)%")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.68))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.52))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.7))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.55))
                 )
         )
     }
@@ -447,17 +447,17 @@ struct DeckView: View {
     }
 
     private func studyMetric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 1) {
             Text(title)
-                .font(.caption2)
-                .foregroundColor(.secondary)
+                .font(.caption2.weight(.medium))
+                .foregroundColor(.secondary.opacity(0.9))
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundColor(BrieflyTheme.Colors.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
     }
 }
 
