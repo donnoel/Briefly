@@ -10,7 +10,7 @@ Success means users can reliably add content, complete deck sessions, and resume
 ## Current product phase (MVP+ implemented)
 1) Current scope
 - Topic library with featured, continue-learning, category browse, active/completed grouping, and contextual sticky headers during scroll
-- Section-based deck sessions with reveal-and-rate flow
+- Section-based deck sessions with multiple-choice quiz flow
 - Local persistence for user topic packs (`user_content.json`)
 - Topic completion/deletion/order persistence in `UserDefaults`
 - Backend-assisted topic generation with review/edit-before-save

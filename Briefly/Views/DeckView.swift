@@ -37,14 +37,6 @@ struct DeckView: View {
         return min(viewModel.currentIndex + 1, viewModel.cards.count)
     }
 
-    private var remainingCards: Int {
-        max(viewModel.cards.count - currentCardNumber, 0)
-    }
-
-    private var progressPercent: Int {
-        Int((progressFraction * 100).rounded())
-    }
-
     private var advanceButtonTitle: String {
         guard !viewModel.cards.isEmpty else { return "Next" }
         return viewModel.currentIndex >= viewModel.cards.count - 1 ? "Finish section" : "Next"
@@ -58,12 +50,7 @@ struct DeckView: View {
                 CardView(
                     card: card,
                     isShowingBack: viewModel.isShowingBack,
-                    revealAction: {
-                        if !viewModel.isShowingBack {
-                            BrieflyHaptics.soft()
-                        }
-                        viewModel.reveal()
-                    }
+                    revealAction: {}
                 )
                 .id(card.id)
                 .padding(.horizontal, 20)
@@ -73,6 +60,9 @@ struct DeckView: View {
                         removal: .move(edge: .leading).combined(with: .opacity)
                     )
                 )
+
+                quizOptionsView
+                    .padding(.horizontal, 20)
 
                 studyStatsView
                     .padding(.horizontal, 20)
@@ -153,7 +143,7 @@ struct DeckView: View {
                 .font(.title3.bold())
                 .foregroundColor(BrieflyTheme.Colors.textPrimary)
 
-            Text("You’ve seen every card in this section. Restart or continue to the next section.")
+            Text("You got \(viewModel.correctAnswerCount) of \(viewModel.totalQuestionCount) correct (\(viewModel.scorePercent)%). Restart or continue to the next section.")
                 .font(.footnote)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -197,32 +187,15 @@ struct DeckView: View {
 
     private var bottomActionTray: some View {
         VStack(spacing: 12) {
-            if viewModel.isShowingBack {
-                HStack(spacing: 12) {
-                    Button {
-                        viewModel.markReviewAndAdvance()
-                    } label: {
-                        Text("Review again")
-                    }
-                    .buttonStyle(BrieflyDeckSecondaryButtonStyle())
-
-                    Button {
-                        BrieflyHaptics.soft()
-                        viewModel.markKnownAndAdvance()
-                    } label: {
-                        Text(advanceButtonTitle)
-                    }
-                    .buttonStyle(BrieflyDeckPrimaryButtonStyle())
-                }
-            } else {
-                Button {
-                    BrieflyHaptics.soft()
-                    viewModel.reveal()
-                } label: {
-                    Text("See answer")
-                }
-                .buttonStyle(BrieflyDeckPrimaryButtonStyle())
+            Button {
+                BrieflyHaptics.soft()
+                viewModel.advanceAfterSubmission()
+            } label: {
+                Text(advanceButtonTitle)
             }
+            .buttonStyle(BrieflyDeckPrimaryButtonStyle())
+            .disabled(!viewModel.hasSubmittedCurrentQuestion)
+            .opacity(viewModel.hasSubmittedCurrentQuestion ? 1 : 0.5)
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -233,11 +206,82 @@ struct DeckView: View {
         }
     }
 
+    private var quizOptionsView: some View {
+        VStack(spacing: 10) {
+            ForEach(viewModel.currentAnswerOptions) { option in
+                Button {
+                    guard !viewModel.hasSubmittedCurrentQuestion else { return }
+                    viewModel.submitAnswer(optionID: option.id)
+                    if option.isCorrect {
+                        BrieflyHaptics.success()
+                    } else {
+                        BrieflyHaptics.light()
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(option.text)
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(BrieflyTheme.Colors.textPrimary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if viewModel.hasSubmittedCurrentQuestion {
+                            if option.isCorrect {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            } else if viewModel.selectedAnswerID == option.id {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .background(answerBackground(for: option))
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.hasSubmittedCurrentQuestion)
+                .accessibilityHint(viewModel.hasSubmittedCurrentQuestion ? "Answer locked for this card" : "Tap to submit answer")
+            }
+        }
+    }
+
+    private func answerBackground(for option: DeckSessionViewModel.QuizOption) -> some View {
+        let strokeColor: Color
+        let fillColor: Color
+
+        if viewModel.hasSubmittedCurrentQuestion {
+            if option.isCorrect {
+                strokeColor = Color.green.opacity(0.7)
+                fillColor = Color.green.opacity(colorScheme == .dark ? 0.2 : 0.12)
+            } else if viewModel.selectedAnswerID == option.id {
+                strokeColor = Color.red.opacity(0.7)
+                fillColor = Color.red.opacity(colorScheme == .dark ? 0.2 : 0.12)
+            } else {
+                strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme)
+                fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.88)
+            }
+        } else if viewModel.selectedAnswerID == option.id {
+            strokeColor = BrieflyTheme.Colors.accent
+            fillColor = BrieflyTheme.Colors.accentSoft(colorScheme)
+        } else {
+            strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme)
+            fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.88)
+        }
+
+        return RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(fillColor)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(strokeColor, lineWidth: 1)
+            )
+    }
+
     private var studyStatsView: some View {
         HStack(spacing: 10) {
             studyMetric(title: "Current", value: "\(currentCardNumber)")
-            studyMetric(title: "Remaining", value: "\(remainingCards)")
-            studyMetric(title: "Progress", value: "\(progressPercent)%")
+            studyMetric(title: "Correct", value: "\(viewModel.correctAnswerCount)")
+            studyMetric(title: "Score", value: "\(viewModel.scorePercent)%")
         }
     }
 
