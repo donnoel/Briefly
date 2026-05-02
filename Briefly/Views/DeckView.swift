@@ -241,6 +241,21 @@ struct DeckView: View {
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.94))
+                .overlay(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    BrieflyTheme.Colors.accent.opacity(colorScheme == .dark ? 0.14 : 0.1),
+                                    Color.clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .padding(1)
+                        .allowsHitTesting(false)
+                }
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
@@ -276,7 +291,8 @@ struct DeckView: View {
 
     private var quizOptionsView: some View {
         VStack(spacing: 10) {
-            ForEach(viewModel.currentAnswerOptions) { option in
+            let optionMarkers = ["A", "B", "C", "D"]
+            ForEach(Array(viewModel.currentAnswerOptions.enumerated()), id: \.element.id) { index, option in
                 Button {
                     guard !viewModel.hasSubmittedCurrentQuestion else { return }
                     viewModel.submitAnswer(optionID: option.id)
@@ -286,7 +302,20 @@ struct DeckView: View {
                         BrieflyHaptics.light()
                     }
                 } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
+                        Text(optionMarkers.indices.contains(index) ? optionMarkers[index] : "")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(markerTextColor(for: option))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(markerFillColor(for: option))
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(markerStrokeColor(for: option), lineWidth: 1)
+                            )
+
                         Text(option.text)
                             .font(.body.weight(.semibold))
                             .foregroundColor(BrieflyTheme.Colors.textPrimary)
@@ -307,7 +336,7 @@ struct DeckView: View {
                     .padding(.vertical, 14)
                     .background(answerBackground(for: option))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(QuizOptionButtonStyle())
                 .disabled(viewModel.hasSubmittedCurrentQuestion)
                 .accessibilityHint(viewModel.hasSubmittedCurrentQuestion ? "Answer locked for this card" : "Tap to submit answer")
             }
@@ -326,15 +355,12 @@ struct DeckView: View {
                 strokeColor = Color.red.opacity(0.55)
                 fillColor = Color.red.opacity(colorScheme == .dark ? 0.18 : 0.1)
             } else {
-                strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme)
-                fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.88)
+                strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.65)
+                fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.75)
             }
-        } else if viewModel.selectedAnswerID == option.id {
-            strokeColor = BrieflyTheme.Colors.accent
-            fillColor = BrieflyTheme.Colors.accentSoft(colorScheme)
         } else {
-            strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme)
-            fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.88)
+            strokeColor = BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.95)
+            fillColor = BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.95)
         }
 
         return RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -343,14 +369,70 @@ struct DeckView: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(strokeColor, lineWidth: 1)
             )
+            .shadow(
+                color: BrieflyTheme.Colors.shadowSoft(colorScheme).opacity(viewModel.hasSubmittedCurrentQuestion ? 0.14 : 0.22),
+                radius: viewModel.hasSubmittedCurrentQuestion ? 2 : 4,
+                x: 0,
+                y: 2
+            )
+    }
+
+    private func markerFillColor(for option: DeckSessionViewModel.QuizOption) -> Color {
+        if viewModel.hasSubmittedCurrentQuestion {
+            if option.isCorrect {
+                return Color.green.opacity(colorScheme == .dark ? 0.24 : 0.14)
+            }
+            if viewModel.selectedAnswerID == option.id {
+                return Color.red.opacity(colorScheme == .dark ? 0.24 : 0.14)
+            }
+        }
+        return BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.95)
+    }
+
+    private func markerStrokeColor(for option: DeckSessionViewModel.QuizOption) -> Color {
+        if viewModel.hasSubmittedCurrentQuestion {
+            if option.isCorrect {
+                return Color.green.opacity(0.65)
+            }
+            if viewModel.selectedAnswerID == option.id {
+                return Color.red.opacity(0.65)
+            }
+        }
+        return BrieflyTheme.Colors.cardStroke(colorScheme)
+    }
+
+    private func markerTextColor(for option: DeckSessionViewModel.QuizOption) -> Color {
+        if viewModel.hasSubmittedCurrentQuestion {
+            if option.isCorrect {
+                return .green
+            }
+            if viewModel.selectedAnswerID == option.id {
+                return .red
+            }
+        }
+        return BrieflyTheme.Colors.textPrimary
     }
 
     private var studyStatsView: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 0) {
             studyMetric(title: "Question", value: "\(currentCardNumber)")
+            Divider()
+                .padding(.vertical, 10)
             studyMetric(title: "Correct", value: "\(viewModel.correctAnswerCount)")
+            Divider()
+                .padding(.vertical, 10)
             studyMetric(title: "Accuracy", value: "\(viewModel.scorePercent)%")
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.68))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme).opacity(0.7))
+                )
+        )
     }
 
     private var completionPerformanceLine: String {
@@ -375,14 +457,15 @@ struct DeckView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(BrieflyTheme.Colors.cardBackground(colorScheme).opacity(0.88))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(BrieflyTheme.Colors.cardStroke(colorScheme))
-                )
-        )
+        .padding(.vertical, 8)
+    }
+}
+
+private struct QuizOptionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.992 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
