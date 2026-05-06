@@ -972,7 +972,7 @@ struct LibraryView: View {
 
     private func openTopic(_ topic: TopicPack) {
         viewModel.recordTopicOpened(topic)
-        coordinator.showTopic(topic)
+        coordinator.showTopic(topicID: topic.id)
     }
 
     private var emptyState: some View {

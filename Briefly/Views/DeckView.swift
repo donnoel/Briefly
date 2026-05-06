@@ -160,7 +160,7 @@ struct DeckView: View {
             if let nextSection = nextSection {
                 Button("Continue to \(nextSection.title)") {
                     BrieflyHaptics.soft()
-                    coordinator.showDeck(for: viewModel.topic, section: nextSection)
+                    coordinator.showDeck(topicID: viewModel.topic.id, sectionID: nextSection.id)
                 }
                 .buttonStyle(BrieflyDeckPrimaryButtonStyle())
             }

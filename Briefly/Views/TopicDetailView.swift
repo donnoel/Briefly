@@ -256,7 +256,7 @@ struct TopicDetailView: View {
         let canStudy = viewModel.canStudy(section)
 
         return Button {
-            coordinator.showDeck(for: viewModel.topic, section: section)
+            coordinator.showDeck(topicID: viewModel.topic.id, sectionID: section.id)
         } label: {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 10) {

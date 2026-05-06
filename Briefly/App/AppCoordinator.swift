@@ -5,19 +5,18 @@ final class AppCoordinator: ObservableObject {
     @Published var path: [Route] = []
 
     enum Route: Hashable {
-        case topic(TopicPack)
-        case deck(TopicPack, TopicSection)
+        case topic(topicID: String)
+        case deck(topicID: String, sectionID: String)
     }
 
     // MARK: - Navigation
 
-    func showTopic(_ topic: TopicPack) {
-        path.append(.topic(topic))
+    func showTopic(topicID: String) {
+        path.append(.topic(topicID: topicID))
     }
 
-    func showDeck(for topic: TopicPack, section: TopicSection) {
-        guard !section.cards.isEmpty else { return }
-        path.append(.deck(topic, section))
+    func showDeck(topicID: String, sectionID: String) {
+        path.append(.deck(topicID: topicID, sectionID: sectionID))
     }
 
     func popToRoot() {
