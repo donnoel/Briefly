@@ -272,7 +272,7 @@ final class LibraryViewModel: ObservableObject {
             return persisted
         } catch {
             Self.logger.error(
-                "Surprise Me persistence failed: classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
+                "Surprise Me persistence failed: classification=\(SurpriseMeErrorClassifier.classify(error), privacy: .public) reason=\(error.localizedDescription, privacy: .public)"
             )
             throw error
         }
@@ -440,7 +440,7 @@ final class LibraryViewModel: ObservableObject {
 
     private func logSurpriseMeError(_ error: Error, stage: String) {
         Self.logger.error(
-            "Surprise Me stage failed: stage=\(stage, privacy: .public) classification=\(self.surpriseMeErrorClassification(for: error), privacy: .public)"
+            "Surprise Me stage failed: stage=\(stage, privacy: .public) classification=\(SurpriseMeErrorClassifier.classify(error), privacy: .public)"
         )
         switch error {
         case let serviceError as AIContentService.ServiceError:
@@ -476,45 +476,6 @@ final class LibraryViewModel: ObservableObject {
         default:
             Self.logger.error("Surprise Me \(stage, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
         }
-    }
-
-    private func surpriseMeErrorClassification(for error: Error) -> String {
-        if let serviceError = error as? AIContentService.ServiceError {
-            switch serviceError {
-            case .emptyResponse:
-                return "empty_response"
-            case .invalidJSON:
-                return "decode_invalid_json"
-            case .dtoDecodingFailed:
-                return "decode_dto_failed"
-            case .validationFailed:
-                return "validation_failed"
-            case .jobTransportUnavailable:
-                return "job_transport_unavailable"
-            }
-        }
-        if let clientError = error as? BrieflyBackendClient.ClientError {
-            switch clientError {
-            case .badResponse:
-                return "backend_http_failure"
-            case .invalidResponse:
-                return "backend_invalid_envelope"
-            case .requestTimedOut:
-                return "backend_timeout"
-            case .transport:
-                return "backend_transport_failure"
-            case .jobNotFound:
-                return "job_not_found"
-            case .jobNotReady:
-                return "job_not_ready"
-            case .jobFailed:
-                return "job_failed"
-            }
-        }
-        if error is ContentRepository.RepositoryError {
-            return "persistence_failure"
-        }
-        return "unknown"
     }
 
     static func sanitizedRandomTopicTitle(generatedTitle: String, requestedTitle: String) -> String {
