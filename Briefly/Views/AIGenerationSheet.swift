@@ -6,6 +6,7 @@ struct AIGenerationSheet: View {
 
     @Binding var isPresented: Bool
     var onSave: (TopicPack) -> Void
+    var saveGeneratedPack: (TopicPackDTO) async throws -> TopicPack?
 
     @State private var title: String = ""
     @State private var difficulty: Difficulty = .beginner
@@ -131,7 +132,7 @@ struct AIGenerationSheet: View {
                                 Self.logger.debug(
                                     "Fresh Topics persistence start: sections=\(editedDTO.sections.count, privacy: .public) cards=\(editedDTO.sections.reduce(0) { $0 + $1.cards.count }, privacy: .public)"
                                 )
-                                if let model = try await ContentRepository.shared.appendOrReplaceUserPack(editedDTO) {
+                                if let model = try await saveGeneratedPack(editedDTO) {
                                     Self.logger.debug("Fresh Topics persistence success")
                                     onSave(model)
                                     isPresented = false

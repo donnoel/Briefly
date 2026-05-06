@@ -134,7 +134,13 @@ struct LibraryView: View {
             prompt: "Search topics"
         )
         .sheet(isPresented: $showingAIGenerator) {
-            AIGenerationSheet(isPresented: $showingAIGenerator) { _ in }
+            AIGenerationSheet(
+                isPresented: $showingAIGenerator,
+                onSave: { _ in },
+                saveGeneratedPack: { dto in
+                    try await viewModel.saveGeneratedPack(dto)
+                }
+            )
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(isPresented: $showingSettings)
@@ -929,7 +935,7 @@ struct LibraryView: View {
 
     private func saveGeneratedReviewDTO(_ dto: TopicPackDTO) async -> Bool {
         do {
-            guard try await ContentRepository.shared.appendOrReplaceUserPack(dto) != nil else {
+            guard try await viewModel.saveGeneratedPack(dto) != nil else {
                 libraryError = "Edited content could not be parsed."
                 return false
             }

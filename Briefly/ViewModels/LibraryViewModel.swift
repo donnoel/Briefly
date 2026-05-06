@@ -141,6 +141,11 @@ final class LibraryViewModel: ObservableObject {
         try await contentRepository.deleteTopic(topic)
     }
 
+    @discardableResult
+    func saveGeneratedPack(_ dto: TopicPackDTO) async throws -> TopicPack? {
+        try await contentRepository.appendOrReplaceUserPack(dto)
+    }
+
     func toggleCompleted(_ topic: TopicPack) {
         contentRepository.toggleCompleted(topic)
     }
