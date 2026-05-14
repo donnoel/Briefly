@@ -34,12 +34,13 @@ jobs:
       - name: Build and test
         run: |
           set -euo pipefail
-          SIM_ID=$(xcrun simctl list devices available --json | ruby -rjson -e 'r = JSON.parse(STDIN.read); preferred = ["iPhone 16 Pro", "iPhone 16", "iPhone 15 Pro", "iPhone 15"]; devices = r.fetch("devices").values.flatten.select { |d| d["isAvailable"] && d["name"] && d["udid"] }; iphones = devices.select { |d| d["name"].start_with?("iPhone") }; abort("No available iPhone simulators found") if iphones.empty?; pick = preferred.map { |name| iphones.find { |d| d["name"] == name } }.compact.first || iphones.first; print pick.fetch("udid")')
+          DESTINATION=$(xcodebuild -project Briefly.xcodeproj -scheme Briefly -showdestinations | ruby -e 'out = STDIN.read; sim_lines = out.lines.grep(/\{ platform:iOS Simulator,/); abort("No iOS Simulator destinations available") if sim_lines.empty?; parsed = sim_lines.filter_map { |line| m = line.match(/OS:([^,]+), name:([^}]+) \}/); next unless m; { os: m[1].strip, name: m[2].strip } }; abort("Unable to parse simulator destinations") if parsed.empty?; preferred = ["iPhone 17 Pro", "iPhone 16 Pro", "iPhone 16", "iPhone SE (3rd generation)"]; pick = preferred.map { |n| parsed.find { |d| d[:name] == n } }.compact.first || parsed.find { |d| d[:name].start_with?("iPhone") } || parsed.first; print "platform=iOS Simulator,OS=#{pick[:os]},name=#{pick[:name]}"')
 
           xcodebuild \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -destination "id=$SIM_ID" \
+            -destination "$DESTINATION" \
+            -destination-timeout 180 \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             clean test
