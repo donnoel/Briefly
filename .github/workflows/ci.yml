@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME=$(xcrun simctl list runtimes available --json | ruby -rjson -e 'r = JSON.parse(STDIN.read); i = r.fetch("runtimes").find { |rt| rt["platform"] == "iOS" }; abort("No available iOS runtime") unless i; print i.fetch("identifier")')
-          DEVICE_TYPE=$(xcrun simctl list devicetypes available --json | ruby -rjson -e 'r = JSON.parse(STDIN.read); i = r.fetch("devicetypes").find { |dt| dt["name"] == "iPhone 16" }; abort("iPhone 16 device type not available") unless i; print i.fetch("identifier")')
+          DEVICE_TYPE=$(xcrun simctl list devicetypes available --json | ruby -rjson -e 'r = JSON.parse(STDIN.read); iphones = r.fetch("devicetypes").select { |dt| dt["name"].start_with?("iPhone") }; abort("No available iPhone device types") if iphones.empty?; preferred = ["iPhone 16 Pro", "iPhone 16", "iPhone 15 Pro", "iPhone 15"]; pick = preferred.map { |name| iphones.find { |dt| dt["name"] == name } }.compact.first || iphones.first; print pick.fetch("identifier")')
           SIM_NAME="CI-iPhone"
           SIM_ID=$(xcrun simctl create "$SIM_NAME" "$DEVICE_TYPE" "$RUNTIME")
           trap 'xcrun simctl delete "$SIM_ID" || true' EXIT
