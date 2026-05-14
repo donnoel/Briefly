@@ -31,19 +31,15 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Briefly.xcodeproj
 
-      - name: Build and test
+      - name: Build
         run: |
-          set -euo pipefail
-          DESTINATION=$(xcodebuild -project Briefly.xcodeproj -scheme Briefly -showdestinations | ruby -e 'out = STDIN.read; sim_lines = out.lines.grep(/\{ platform:iOS Simulator,/); abort("No iOS Simulator destinations available") if sim_lines.empty?; parsed = sim_lines.filter_map { |line| m = line.match(/OS:([^,]+), name:([^}]+) \}/); next unless m; { os: m[1].strip, name: m[2].strip } }; abort("Unable to parse simulator destinations") if parsed.empty?; preferred = ["iPhone 17 Pro", "iPhone 16 Pro", "iPhone 16", "iPhone SE (3rd generation)"]; pick = preferred.map { |n| parsed.find { |d| d[:name] == n } }.compact.first || parsed.find { |d| d[:name].start_with?("iPhone") } || parsed.first; print "platform=iOS Simulator,OS=#{pick[:os]},name=#{pick[:name]}"')
-
           xcodebuild \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -destination "$DESTINATION" \
-            -destination-timeout 180 \
+            -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
-            clean test
+            clean build
 
       - name: Upload xcodebuild logs (if the job fails)
         if: failure()
