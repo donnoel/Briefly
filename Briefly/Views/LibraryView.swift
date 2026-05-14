@@ -277,7 +277,7 @@ struct LibraryView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    showingAIGenerator = true
+                    startTopicCreation()
                 } label: {
                     overviewActionButton(
                         title: "Create Topic",
@@ -894,6 +894,14 @@ struct LibraryView: View {
         viewModel.searchText = ""
     }
 
+    private func startTopicCreation() {
+        if ProcessInfo.processInfo.arguments.contains("-uiTestUseCannedGeneratedPack") {
+            cannedGeneratedReviewDTO = Self.uiTestCannedGeneratedPack()
+        } else {
+            showingAIGenerator = true
+        }
+    }
+
     private func saveGeneratedReviewDTO(_ dto: TopicPackDTO) async -> Bool {
         do {
             guard try await viewModel.saveGeneratedPack(dto) != nil else {
@@ -956,7 +964,7 @@ struct LibraryView: View {
                 .padding(.horizontal, 32)
             HStack(spacing: 12) {
                 Button("Create Topic") {
-                    showingAIGenerator = true
+                    startTopicCreation()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)

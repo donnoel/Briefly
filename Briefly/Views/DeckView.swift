@@ -339,6 +339,7 @@ struct DeckView: View {
                 }
                 .buttonStyle(QuizOptionButtonStyle())
                 .disabled(viewModel.hasSubmittedCurrentQuestion)
+                .accessibilityIdentifier(option.isCorrect ? "deck.answer.option.correct" : "deck.answer.option")
                 .accessibilityHint(viewModel.hasSubmittedCurrentQuestion ? "Answer locked for this card" : "Tap to submit answer")
             }
         }

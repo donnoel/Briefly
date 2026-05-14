@@ -31,15 +31,91 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Briefly.xcodeproj
 
-      - name: Build
+      - name: Show environment
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          xcrun simctl list runtimes
+          xcrun simctl list devicetypes
+          xcodebuild -project Briefly.xcodeproj -scheme Briefly -showdestinations
+
+      - name: Prepare simulator
+        id: simulator
+        run: |
+          set -euo pipefail
+          SIMULATOR_ID="$(python3 <<'PY'
+          import json
+          import subprocess
+
+          runtimes = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "--json"])
+          )["runtimes"]
+          ios_runtimes = [
+              runtime for runtime in runtimes
+              if runtime.get("platform") == "iOS" and runtime.get("isAvailable")
+          ]
+          if not ios_runtimes:
+              raise SystemExit("No available iOS simulator runtimes.")
+
+          def version_key(runtime):
+              return tuple(int(part) for part in runtime.get("version", "0").split("."))
+
+          runtime_identifier = sorted(ios_runtimes, key=version_key)[-1]["identifier"]
+
+          device_types = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "--json"])
+          )["devicetypes"]
+          iphone_types = [
+              device_type for device_type in device_types
+              if device_type.get("name", "").startswith("iPhone")
+          ]
+          if not iphone_types:
+              raise SystemExit("No iPhone simulator device types.")
+
+          preferred_names = [
+              "iPhone 17 Pro",
+              "iPhone 16 Pro",
+              "iPhone 16",
+              "iPhone SE (3rd generation)",
+          ]
+          selected_device = next(
+              (
+                  device_type for preferred_name in preferred_names
+                  for device_type in iphone_types
+                  if device_type.get("name") == preferred_name
+              ),
+              iphone_types[-1],
+          )
+
+          simulator_id = subprocess.check_output(
+              [
+                  "xcrun",
+                  "simctl",
+                  "create",
+                  "CI iPhone",
+                  selected_device["identifier"],
+                  runtime_identifier,
+              ],
+              text=True,
+          ).strip()
+          print(simulator_id)
+          PY
+          )"
+          echo "id=${SIMULATOR_ID}" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "${SIMULATOR_ID}" || true
+          xcrun simctl bootstatus "${SIMULATOR_ID}" -b
+
+      - name: Build and test
         run: |
           xcodebuild \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}' \
+            -parallel-testing-enabled NO \
+            -maximum-concurrent-test-simulator-destinations 1 \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
-            clean build
+            clean test
 
       - name: Upload xcodebuild logs (if the job fails)
         if: failure()

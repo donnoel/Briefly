@@ -25,7 +25,7 @@ final class BrieflyUITests: XCTestCase {
     @MainActor
     func testExample() throws {
         // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+        let app = makeSeededApp()
         app.launch()
 
         // Use XCTAssert and related functions to verify your tests produce the correct results.
@@ -35,7 +35,7 @@ final class BrieflyUITests: XCTestCase {
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            makeSeededApp().launch()
         }
     }
 
@@ -159,9 +159,7 @@ final class BrieflyUITests: XCTestCase {
         openFirstTopic(in: app)
         openFirstSectionInTopic(in: app)
 
-        let seeAnswerButton = app.buttons["See answer"].firstMatch
-        XCTAssertTrue(seeAnswerButton.waitForExistence(timeout: 5), "Expected deck screen to appear.")
-        seeAnswerButton.tap()
+        submitCurrentAnswer(in: app)
     }
 
     @MainActor
@@ -180,20 +178,21 @@ final class BrieflyUITests: XCTestCase {
 
     @MainActor
     private func openGenerationSheet(in app: XCUIApplication) {
-        let libraryMenu = app.buttons["Models, filters, and generate"].firstMatch
-        XCTAssertTrue(libraryMenu.waitForExistence(timeout: 20), "Expected library generation menu to appear.")
-        libraryMenu.tap()
+        let createTopicButton = app.buttons["Create Topic"].firstMatch
+        XCTAssertTrue(createTopicButton.waitForExistence(timeout: 20), "Expected library create topic action to appear.")
+        createTopicButton.tap()
+    }
 
-        let generateButton = app.buttons["Generate"].firstMatch
-        XCTAssertTrue(generateButton.waitForExistence(timeout: 5), "Expected generation command in library menu.")
-        generateButton.tap()
+    @MainActor
+    private func submitCurrentAnswer(in app: XCUIApplication) {
+        let answerButton = app.buttons["deck.answer.option.correct"].firstMatch
+        XCTAssertTrue(answerButton.waitForExistence(timeout: 5), "Expected deck screen to show the correct answer option.")
+        answerButton.tap()
     }
 
     @MainActor
     private func finishCurrentSection(in app: XCUIApplication) {
-        let seeAnswerButton = app.buttons["See answer"].firstMatch
-        XCTAssertTrue(seeAnswerButton.waitForExistence(timeout: 5), "Expected deck screen to show the answer reveal action.")
-        seeAnswerButton.tap()
+        submitCurrentAnswer(in: app)
 
         let finishButton = app.buttons["Finish section"].firstMatch
         XCTAssertTrue(finishButton.waitForExistence(timeout: 5), "Expected final card to expose the finish action.")

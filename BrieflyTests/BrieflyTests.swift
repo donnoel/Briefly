@@ -268,19 +268,15 @@ struct ContentRepositoryTests {
     }
 
     @Test
-    func coordinatorDoesNotNavigateToEmptySectionDeck() {
-        let emptySection = TopicSection(id: "empty", title: "Empty", cards: [])
+    func coordinatorNavigatesToDeckRouteByID() {
         let readySection = TopicSection(id: "ready", title: "Ready", cards: [
             Card(id: "ready_card", front: "Question", back: "Answer")
         ])
-        let topic = makeTopic(id: "guarded_topic", sections: [emptySection, readySection])
+        let topic = makeTopic(id: "guarded_topic", sections: [readySection])
         let coordinator = AppCoordinator()
 
-        coordinator.showDeck(for: topic, section: emptySection)
-        #expect(coordinator.path.isEmpty)
-
-        coordinator.showDeck(for: topic, section: readySection)
-        #expect(coordinator.path == [.deck(topic, readySection)])
+        coordinator.showDeck(topicID: topic.id, sectionID: readySection.id)
+        #expect(coordinator.path == [.deck(topicID: topic.id, sectionID: readySection.id)])
     }
 
     private func makeRepository(

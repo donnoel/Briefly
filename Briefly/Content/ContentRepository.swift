@@ -50,7 +50,7 @@ final class ContentRepository: ObservableObject {
         self.statusStore = statusStore ?? .shared
         self.orderStore = orderStore ?? .shared
         self.progressStore = progressStore ?? .shared
-        self.cloudSyncService = ProcessInfo.processInfo.arguments.contains("-uiTestDisableCloudSync")
+        self.cloudSyncService = Self.shouldSkipCloudSync
             ? nil
             : (cloudSyncService ?? CloudTopicSyncService.shared)
         observeStoreChangesForCloudSync()
@@ -58,6 +58,11 @@ final class ContentRepository: ObservableObject {
             await performInitialLoad()
             refreshFromCloud()
         }
+    }
+
+    private static var shouldSkipCloudSync: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTestDisableCloudSync")
+            || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
     // MARK: - Loading

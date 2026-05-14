@@ -2,10 +2,19 @@ import UIKit
 import CloudKit
 
 final class BrieflyAppDelegate: NSObject, UIApplicationDelegate {
+    private static var shouldSkipCloudSetup: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTestDisableCloudSync")
+            || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        guard !Self.shouldSkipCloudSetup else {
+            return true
+        }
+
         application.registerForRemoteNotifications()
         Task {
             await CloudTopicSyncService.shared.ensureChangeSubscription()
