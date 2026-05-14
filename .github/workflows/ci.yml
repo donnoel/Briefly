@@ -1,24 +1,23 @@
-CI.yml
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
-    runs-on: macos-15  # macOS 15 is GA and is what macos-latest maps to now
+    runs-on: macos-15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
-      # Optional but speeds things up a lot: cache SwiftPM artifacts
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:
@@ -32,21 +31,26 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Briefly.xcodeproj
 
-      # Build + test on the latest iOS simulator
       - name: Build and test
         run: |
-          set -e
+          set -euo pipefail
+          RUNTIME=$(xcrun simctl list runtimes available --json | ruby -rjson -e 'r = JSON.parse(STDIN.read); i = r.fetch("runtimes").find { |rt| rt["platform"] == "iOS" }; abort("No available iOS runtime") unless i; print i.fetch("identifier")')
+          DEVICE_TYPE=$(xcrun simctl list devicetypes available --json | ruby -rjson -e 'r = JSON.parse(STDIN.read); i = r.fetch("devicetypes").find { |dt| dt["name"] == "iPhone 16" }; abort("iPhone 16 device type not available") unless i; print i.fetch("identifier")')
+          SIM_NAME="CI-iPhone"
+          SIM_ID=$(xcrun simctl create "$SIM_NAME" "$DEVICE_TYPE" "$RUNTIME")
+          trap 'xcrun simctl delete "$SIM_ID" || true' EXIT
+
           xcodebuild \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -destination "platform=iOS Simulator,OS=latest,name=iPhone 17 Pro Max" \
+            -destination "id=$SIM_ID" \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
-            clean test | xcpretty
+            clean test
 
       - name: Upload xcodebuild logs (if the job fails)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: xcodebuild-logs
-          path: ~/Library/Logs/scan # or fall back to derived logs if you prefer
+          path: ~/Library/Logs/DiagnosticReports
