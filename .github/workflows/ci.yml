@@ -8,7 +8,10 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    runs-on: macos-26
+    env:
+      DERIVED_DATA: ${{ github.workspace }}/DerivedData
+      RESULT_BUNDLE: ${{ github.workspace }}/TestResults/Briefly.xcresult
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -58,7 +61,13 @@ jobs:
               raise SystemExit("No available iOS simulator runtimes.")
 
           def version_key(runtime):
-              return tuple(int(part) for part in runtime.get("version", "0").split("."))
+              parts = []
+              for part in runtime.get("version", "0").split("."):
+                  try:
+                      parts.append(int(part))
+                  except ValueError:
+                      break
+              return tuple(parts)
 
           runtime_identifier = sorted(ios_runtimes, key=version_key)[-1]["identifier"]
 
@@ -74,6 +83,7 @@ jobs:
 
           preferred_names = [
               "iPhone 17 Pro",
+              "iPhone 17",
               "iPhone 16 Pro",
               "iPhone 16",
               "iPhone SE (3rd generation)",
@@ -107,19 +117,25 @@ jobs:
 
       - name: Build and test
         run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$RESULT_BUNDLE")"
+          rm -rf "$RESULT_BUNDLE"
           xcodebuild \
             -project Briefly.xcodeproj \
             -scheme Briefly \
+            -configuration Debug \
             -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}' \
+            -derivedDataPath "$DERIVED_DATA" \
+            -resultBundlePath "$RESULT_BUNDLE" \
             -parallel-testing-enabled NO \
             -maximum-concurrent-test-simulator-destinations 1 \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
             clean test
 
-      - name: Upload xcodebuild logs (if the job fails)
+      - name: Upload xcodebuild artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-logs
-          path: ~/Library/Logs/DiagnosticReports
+          name: xcodebuild-artifacts
+          path: |
+            ${{ env.RESULT_BUNDLE }}
+            ${{ env.DERIVED_DATA }}/Logs/Test
