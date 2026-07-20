@@ -1,0 +1,22 @@
+title: Briefly
+description: Fast, repeatable topic study through focused flashcard sessions.
+tagline: Learn a topic in the time you have.
+project_label: Don Noel / Projects
+status_label: MVP+ learning
+github_url: https://github.com/donnoel/Briefly
+url: https://donnoel.github.io
+baseurl: /Briefly
+lang: en-US
+
+remote_theme: donnoel/projects-theme@v1.0.0
+plugins:
+  - jekyll-remote-theme
+
+exclude:
+  - AGENTS.md
+  - AGENTS.project.md
+  - Briefly
+  - Briefly.xcodeproj
+  - BrieflyTests
+  - BrieflyUITests
+
