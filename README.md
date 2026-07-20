@@ -191,9 +191,9 @@ Briefly/
 
 ---
 
-## ❤️ Credits
+## Credits
 
-Built by **Don Noel**.
+Built with care by **Don Noel** and Codex collaboration.
 
 ---
 
