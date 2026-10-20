@@ -1,16 +1,24 @@
-# ✨ **Briefly**
+# **Briefly**
+
 ### *AI-generated study decks, distilled into fast, satisfying flashcards.*
 
 <p align="center">
-  <img src="https://img.shields.io/badge/SwiftUI-iOS-orange?logo=swift">
-  <img src="https://img.shields.io/badge/Architecture-MVVM%20%2B%20Stores-purple">
-  <img src="https://img.shields.io/badge/AI-Backend%20Generation-green">
-  <img src="https://img.shields.io/badge/Storage-Documents%20JSON%20%2B%20iCloud-blue">
+  <img src="https://img.shields.io/badge/SwiftUI-iOS-orange?logo=swift" alt="SwiftUI: iOS">
+  <img src="https://img.shields.io/badge/Architecture-MVVM%20%2B%20Stores-purple" alt="Architecture: MVVM + Stores">
+  <img src="https://img.shields.io/badge/AI-Backend%20Generation-green" alt="AI: Backend Generation">
+  <img src="https://img.shields.io/badge/Storage-Documents%20JSON%20%2B%20iCloud-blue" alt="Storage: Documents JSON + iCloud">
+  <img src="https://img.shields.io/badge/Platforms-iOS%20%2B%20iPadOS-blue" alt="Platforms: iOS + iPadOS">
+  <img src="https://img.shields.io/badge/Repository-Archived-lightgrey?logo=github&logoColor=white" alt="Repository: Archived">
 </p>
+
+> **Archived on GitHub.** The implementation and development notes below describe the retained project.
 
 ---
 
-## ✨ What is Briefly?
+## ✨ Overview
+
+<a id="-what-is-briefly"></a>
+<a id="what-is-briefly"></a>
 
 **Briefly** is a SwiftUI learning app that helps you create and review *topic packs* made of **sections** and **flashcards**.
 
@@ -22,9 +30,20 @@ You can:
 
 If you want new material, Briefly can **generate a full topic pack through Briefly's backend**, then lets you **review/edit it before saving**.
 
----
-
 ## 💎 Core Features
+
+| Feature | What it does |
+| --- | --- |
+| **Topic library** | Browse topic packs organized into sections and flashcards. |
+| **Study sessions** | Review focused decks and track learning progress. |
+| **Content generation** | Use the documented backend generation flow. |
+| **Saved progress** | Resume study from the app's stored topic and progress data. |
+
+<details>
+<summary>Feature details and controls</summary>
+
+<a id="-core-features"></a>
+<a id="core-features"></a>
 
 | Feature | Description |
 |--------|-------------|
@@ -38,11 +57,12 @@ If you want new material, Briefly can **generate a full topic pack through Brief
 | 🔎 **Search + Filters** | Search topics and filter by category/difficulty. |
 | 🗃️ **Local Persistence** | User-created content persists to disk and syncs through iCloud when available. |
 
----
+<a id="-how-to-use"></a>
+<a id="how-to-use"></a>
 
-## 🎛 How to Use
+### How to Use
 
-### Library
+#### Library
 - The home screen now opens with a richer library layout:
   - a progress overview
   - a **Continue Learning** carousel driven by in-progress and recently opened topics
@@ -58,13 +78,13 @@ If you want new material, Briefly can **generate a full topic pack through Brief
   - **Leading**: mark complete/incomplete
   - **Trailing**: delete
 
-### Topic Detail
+#### Topic Detail
 - See an immersive topic hero with category, difficulty, section/card counts, and progress.
 - The topic hero collapses into a compact pinned header as you scroll.
 - Sections are presented as elevated entry cards that keep review actions easy to scan.
 - Tap a section to start a deck session.
 
-### Deck Session
+#### Deck Session
 - Tap the card (or **See answer**) to reveal the back with a flip animation.
 - After revealing:
   - **Next** marks the card learned and advances (becomes **Finish section** on the final card)
@@ -73,7 +93,7 @@ If you want new material, Briefly can **generate a full topic pack through Brief
 - Card height stays stable between cards, with internal scrolling for longer content and a compact stats row for current/remaining/progress.
 - When a section finishes, you can restart or continue to the next section.
 
-### AI Generation
+#### AI Generation
 - Tap **Generate with AI** (sparkles).
 - Choose:
   - topic title/concept
@@ -81,18 +101,38 @@ If you want new material, Briefly can **generate a full topic pack through Brief
   - number of sections + cards per section
 - Briefly generates in batches with visible progress, then opens a **review screen**.
 
+</details>
+
 ---
 
-## 🔒 AI Generation Access
+## 🚀 Getting Started
+
+<a id="-ai-generation-access"></a>
+<a id="ai-generation-access"></a>
+
+### AI Generation Access
 
 Briefly no longer requires a user-provided OpenAI API key for generation.
 
 - Open **Settings** (gear icon) to confirm backend generation status.
 - App version/build is shown in iOS Settings for Briefly under **Version**.
 
----
+<a id="-getting-started"></a>
+<a id="getting-started"></a>
 
-## 🧠 How it works
+### Requirements
+- Xcode with the iOS 26.1 SDK or newer
+- iOS Simulator or device
+
+### Run
+1. Open the project in Xcode
+2. Select an iOS simulator
+3. Build & Run
+
+## 🧠 How It Works
+
+<a id="-how-it-works"></a>
+<a id="how-it-works"></a>
 
 Briefly is organized around a few simple layers:
 
@@ -116,9 +156,10 @@ Briefly is organized around a few simple layers:
 - `AIContentService` generates a `TopicPackDTO`.
 - `GeneratedPackReviewView` lets you review/edit before saving.
 
----
+<a id="-project-structure"></a>
+<a id="project-structure"></a>
 
-## 📁 Project Structure
+### Project Structure
 
 ```text
 Briefly/
@@ -157,44 +198,40 @@ Briefly/
     └── TopicOrderStore.swift
 ```
 
----
+## 🔒 Data and Privacy
 
-## 🚀 Getting Started
+<a id="-notes"></a>
+<a id="notes"></a>
 
-### Requirements
-- Xcode
-- iOS Simulator or device
-
-### Run
-1. Open the project in Xcode
-2. Select an iOS simulator
-3. Build & Run
-
----
-
-## 🧭 Notes
+### Notes
 
 - If you don’t include `seed_content.json` in the app bundle, the library may start empty until you generate or import content.
 - Generated packs are saved locally as JSON in your Documents directory.
 - Generated/user topics are synced to iCloud (private CloudKit database) when available.
 - Topic completion/deletion state is tracked separately so you can hide seed topics too.
 
----
+## 📚 Documentation
 
-## 🗺️ Roadmap (starter)
+- [Repository guidance](AGENTS.md)
+- [Project guide](AGENTS.project.md)
+
+## 🗺️ Roadmap
+
+<a id="-roadmap-starter"></a>
+<a id="roadmap-starter"></a>
 
 - [ ] Ship a small bundled seed library (`seed_content.json`)
 - [ ] Better “edit pack” tools (bulk edits, section reorder)
 - [ ] Spaced repetition scheduling (due dates, intervals)
-- [ ] iCloud sync (optional)
+- [x] Private CloudKit topic and topic-order synchronization
 - [ ] Home screen widgets
 
 ---
 
-## Credits
+## 🤝 Credits
+
+<a id="credits"></a>
 
 Built with care by **Don Noel** and Codex collaboration.
-
----
 
 > *Briefly is about learning momentum: tiny sessions, clean progress, and the right next card.*
